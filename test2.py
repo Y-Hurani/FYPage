@@ -9,6 +9,7 @@ from Agent import Agent
 from CooperativeAgent import CooperativeAgent
 from TFTAgent import TFTAgent
 from DefectingAgent import DefectingAgent
+from SARSAAgent import SARSAAgent
 #from MoodySARSAAgent import MoodySARSAAgent
 from testing_cypo import create_dash_app  # Replace with your actual filename
 from testing_cypo import nx_to_cytoscape
@@ -53,9 +54,7 @@ class MoodySARSAAgent(Agent):
         """
         Adjust mood based on self-performance and fairness using opponent's payoff history.
         """
-
         avg_self_reward = self.average_reward(opponent_id)
-
 
         # Calculate average rewards including the new payoff
         self_payoffs = self.memories[opponent_id]
@@ -70,7 +69,7 @@ class MoodySARSAAgent(Agent):
         avg_opponent_reward_t = opponent_average"""
 
         # Calculate alpha and omega (Homo Egualis adjustment)
-        alpha = (100 - self.mood) / 120
+        alpha = (100 - self.mood) / 100
         beta = alpha
         omega = avg_self_reward_t - (alpha * max(avg_opponent_reward_t - avg_self_reward_t, 0)) - (beta * max(avg_self_reward_t - avg_opponent_reward_t, 0))
         #print((reward - avg_self_reward) + self.prev_omegas[opponent_id])
@@ -158,14 +157,10 @@ class MoodySARSAAgent(Agent):
     def keep_connected_to_opponent(self, opponent_id, average_considered_betrayal, round=50):
         avg_A = self.average_reward(opponent_id)  # Avg payoff against opponent
         if avg_A < average_considered_betrayal:
-
             self.betrayal_memory.add(opponent_id)  # A Add B to list of betrayers
             return 0
         else:
-            if opponent_id == 5:
-                print(self.id, avg_A)
             return 1
-
 
 class PrisonersDilemmaEnvironment:
     def __init__(self, n_agents, n_states=10):
@@ -226,7 +221,6 @@ class PrisonersDilemmaEnvironment:
         else:  # Agent B defected
             self.trust_levels[agent_A][agent_B] = max(0, self.trust_levels[agent_A][agent_B] - 1)
 
-
 def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     """
     Plays one game of IPD between two agents, retrieving states from the environment.
@@ -236,12 +230,12 @@ def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     # state_A = env.trust_levels[id_A][id_B]
     # state_B = env.trust_levels[id_B][id_A]
 
-    state_A = agent_A.mood
-    state_B = agent_B.mood
+    state_A = agent_A.mood if isinstance(agent_A, MoodySARSAAgent) else 50
+    state_B = agent_B.mood if isinstance(agent_B, MoodySARSAAgent) else 50
 
     # Agents choose actions
-    action_A = agent_A.choose_action(state_A, id_B, fixed)
-    action_B = agent_B.choose_action(state_B, id_A, fixed)
+    action_A = agent_A.choose_action(state_B, id_B, fixed)
+    action_B = agent_B.choose_action(state_A, id_A, fixed)
 
     # Step in the environment to get next states and rewards
     (reward_A, reward_B) = env.step(id_A, id_B, action_A, action_B)
@@ -276,7 +270,6 @@ def calculate_distance(node_a, node_b, positions=node_positions):
     x2, y2 = positions[node_b]
     return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
-
 def create_networkx_graph(num_nodes=25, num_edges=40):
     graph = nx.Graph()
     # Add nodes
@@ -297,7 +290,6 @@ def agent_class_condition(node, agents):
     else:
         return 'orange'  # Default color for other classes
 
-
 def add_nodes_to_graph(graph):
     # Randomly create edges between nodes
     while graph.number_of_edges() < num_edges:
@@ -310,14 +302,8 @@ def add_nodes_to_graph(graph):
             graph.add_edge(node_a, node_b)
 
         return graph
-def visualize(graph, grid_size=7):
-    colors = []
 
-    for node in range(num_nodes):
-        if isinstance(node, MoodySARSAAgent):
-            colors.append("red")
-        else:
-            colors.append("blue")
+def visualize(graph, grid_size=7):
     net = Network(notebook=True, directed=False, cdn_resources='remote')  # Non-directed graph
 
     # Define fixed positions for the nodes in a grid
@@ -329,16 +315,12 @@ def visualize(graph, grid_size=7):
         node_positions[node] = (x, y)
 
     for node, (x, y) in node_positions.items():
-        net.add_node(node, label=str(agents[node].mood), x=x, y=y, fixed=True)
+        net.add_node(node, x=x, y=y, fixed=True)
 
     for edge in graph.edges:
         net.add_edge(*edge)
 
-    #disable physics
-    net.set_options('''var options = { "physics": { "enabled": false } }''')
-
     return net
-
 
 def generate_agents(n_agents, weights, n_states, n_actions):
     """
@@ -353,6 +335,7 @@ def generate_agents(n_agents, weights, n_states, n_actions):
     """
     agent_classes = {
         "MoodySARSAAgent": MoodySARSAAgent,
+        "SARSAAgent": SARSAAgent,
         "CooperativeAgent": CooperativeAgent,
         "DefectingAgent": DefectingAgent,
         "TFTAgent": TFTAgent
@@ -375,45 +358,61 @@ def generate_agents(n_agents, weights, n_states, n_actions):
 
     return agents
 
+def mood_to_color(mood):
+    """
+    Converts mood (1 to 100) to a grayscale hex color.
+    """
+    # Clamp to range
+    mood = max(1, min(100, mood))
+    # Map mood to grayscale intensity (0 = black, 255 = white)
+    intensity = int((mood / 100) * 255)
+    hex_value = f'{intensity:02x}'  # 2-digit hex
+    return f'#{hex_value}{hex_value}{hex_value}'
+
+def update_colors_moods():
+    colors, moods = [], []
+    for agent in agents:
+        moods.append('None')
+        if isinstance(agent, CooperativeAgent):
+            colors.append('green')
+        elif isinstance(agent, MoodySARSAAgent):
+            colors.append(mood_to_color(agent.mood))
+            moods[-1] = agent.mood
+        elif isinstance(agent, TFTAgent):
+            colors.append('pink')
+        elif isinstance(agent, DefectingAgent):
+            colors.append('red')
+        else:
+            colors.append('yellow')
+    return colors, moods
 
 # Create a graph and visualize it
-num_nodes = 49
+num_nodes = 100
 num_edges = 50
 max_connection_distance = 225
 graph = create_networkx_graph(num_nodes=num_nodes, num_edges=num_edges)
-
 # Initiate variables
 n_agents = num_nodes
 n_states = 100
 n_actions = 2  # Actions: 0 = defect, 1 = coop
 fixed = 0
 weights = {
-    "MoodySARSAAgent": 0.85,  # 50% chance
-    "CooperativeAgent": 0.05,  # 20% chance
-    "DefectingAgent": 0.05,  # 20% chance
-    "TFTAgent": 0.05  # 10% chance
+    "SARSAAgent": 0.2,
+    "MoodySARSAAgent": 0.8,
+    "CooperativeAgent": 0.00,  
+    "DefectingAgent": 0.00,  
+    "TFTAgent": 0.00
 }
 
 agents = generate_agents(n_agents, weights, n_states, n_actions)
-visualize(graph)
+colors, moods = update_colors_moods()
+visualize(graph, int(math.sqrt(num_nodes)))
 add_nodes_to_graph(graph)
 #agents = [MoodySARSAAgent(n_states=n_states, n_actions=n_actions, n_agents=n_agents, id=_) for _ in range(n_agents)]
 #agents[24] = CooperativeAgent(id=24, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
 #agents[1] = TFTAgent(id=1, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
 #agents[5] = DefectingAgent(id=5, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
 env = PrisonersDilemmaEnvironment(n_agents=n_agents, n_states=n_states)
-colors = []
-for agent in agents:
-    if isinstance(agent, CooperativeAgent):
-        colors.append('green')
-    elif isinstance(agent, MoodySARSAAgent):
-        colors.append('orange')
-    elif isinstance(agent, TFTAgent):
-        colors.append('pink')
-    elif isinstance(agent, DefectingAgent):
-        colors.append('red')
-    else:
-        colors.append('yellow')
 
 # pair matches
 num_games_per_pair = 24999
@@ -421,18 +420,13 @@ removed_edges_list = []
 reconstruction_interval = 10  # Number of rounds before reconstruction
 percent_reconnection = 0.20  # 10% of the population for random reconnection
 average_considered_betrayal = 2.5
-network_visualization = visualize(graph)
-network_visualization.show("network.html")
 
-# Visualize with grid layout
-network_visualization = visualize(graph)
-network_visualization.show("network.html")
 
 # Start the Dash app in a separate thread or process
 app = create_dash_app(graph, colors)
 
 # Start Dash server in thread
-thread = threading.Thread(target=lambda: app.run_server(debug=True, use_reloader=False))
+thread = threading.Thread(target=lambda: app.run(debug=True, use_reloader=False))
 thread.daemon = True
 thread.start()
 
@@ -441,54 +435,7 @@ possible_pairs = [(a, b) for a in range(n_agents) for b in range(a + 1, n_agents
 subset_size = int(len(possible_pairs) * percent_reconnection)
 
 
-'''
-for i in range(num_games_per_pair):
-    for edge in graph.edges():
-        #print(agents[edge[1]], graph.edges(), agents)
-        play_game(agents[edge[0]], agents[edge[1]], env, edge[0], edge[1], fixed)
-    if fixed >= 1:
-        fixed = fixed - 1
-    #if fixed == 1:
-    #    print(agents[0].q_tables)
 
-    # Perform reconstruction every 'reconstruction_interval' iterations
-    if (i+1) % (reconstruction_interval * 100) == 1:
-        print(env.total)
-        print(i)
-        env.reset()
-        for agent in agents:
-            agent.betrayal_memory.clear()
-
-    if (i + 1) % reconstruction_interval == 0:
-        print(f"Reconstruction event at iteration {i + 1}")
-        #time.sleep(0.25)
-
-        # Generate a list of all possible agent pairs
-        evaluated_pairs = random.sample(possible_pairs, subset_size)
-
-
-        # Evaluate each pair in the sampled subset
-        for agent_a, agent_b in evaluated_pairs:
-            distance = calculate_distance(agent_b, agent_a)
-            if distance > max_connection_distance:
-                continue
-            if graph.has_edge(agent_a, agent_b):
-                # Existing connection: Check for severance
-                decision_a = agents[agent_a].keep_connected_to_opponent(agent_b, i)
-                #decision_b = agents[agent_b].keep_connected_to_opponent(agent_a, i)
-
-                if decision_a == 0:# or decision_b == 0:
-                    graph.remove_edge(agent_a, agent_b)
-                    #print(f"Removing edge {agent_a} and ")
-                    time.sleep(0.1)
-            else:
-                # Potential new connection: Check for rejection history
-                if (agent_b not in agents[agent_a].betrayal_memory and
-                        agent_a not in agents[agent_b].betrayal_memory):
-                    graph.add_edge(agent_a, agent_b)
-        network_visualization = visualize(graph)
-        network_visualization.show("network.html")
-'''
 # game loop to update the Dash graph
 for i in range(num_games_per_pair):
     for edge in graph.edges():
@@ -498,10 +445,10 @@ for i in range(num_games_per_pair):
 
     if (i + 1) % (reconstruction_interval * 100) == 1:
         print(env.total)
-        print(i)
         env.reset()
         for agent in agents:
-            agent.betrayal_memory.clear()
+            if isinstance(agent, MoodySARSAAgent):
+                agent.betrayal_memory.clear()
 
     if (i + 1) % reconstruction_interval == 0:
         print(f"Reconstruction event at iteration {i + 1}")
@@ -518,31 +465,26 @@ for i in range(num_games_per_pair):
                 if decision_a == 0:# or decision_b == 0:
                     graph.remove_edge(agent_a, agent_b)
             else:
-                if (agent_b not in agents[agent_a].betrayal_memory and
-                        agent_a not in agents[agent_b].betrayal_memory):
+                # If either of the agents are moody and hold grudge against opponent, dont connect
+                condition_A, condition_B = True, True
+                if isinstance(agent_a, MoodySARSAAgent):
+                    if agent_b in agents[agent_a].betrayal_memory:
+                        condition_A = False
+
+                if isinstance(agent_b, MoodySARSAAgent):
+                    if agent_a in agents[agent_b].betrayal_memory:
+                        condition_B = False
+
+                if condition_A and condition_B:
                     graph.add_edge(agent_a, agent_b)
 
         # Trigger Dash Cytoscape to redraw the updated graph
         # This replaces `network_visualization.show("network.html")`
-        elements = nx_to_cytoscape(graph, colors)
+        colors, moods = update_colors_moods()
+        elements = nx_to_cytoscape(graph, colors, moods)
         app.layout.children[-1].elements = elements
-        time.sleep(0.1)  # Allow Dash to process changes
-
+        app.layout.children[-2].data = colors
+        app.layout.children[-3].data = moods
         for agent in agents:
             if isinstance(agent, MoodySARSAAgent):
                 agent.set_epsilon(agent.epsilon * 0.9995)
-
-network_visualization = visualize(graph)
-network_visualization.show("network.html")
-
-
-'''for i in graph.edges():
-    if i[0] == 0 or i[0] == 1:
-        print(f"agent {i[1]}:", agents[i[1]].memories[i[0]], agents[i[1]].mood, agents[i[1]].q_tables[i[0]], (i[0], i[1]))
-    else:
-        continue
-        print(f"agent {i[0]}:", agents[i[0]].memories[i[1]], agents[i[0]].mood, agents[i[0]].q_tables[i[1]], (i[0], i[1]))'''
-for agent in agents:
-    print(f"{agent.id}:", agent.mood)
-for edge in graph.edges():
-    print(edge, agents[edge[0]].memories[edge[1]], agents[edge[1]].memories[edge[0]])

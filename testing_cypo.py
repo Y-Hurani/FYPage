@@ -3,7 +3,7 @@ from dash import dcc, html
 import dash_cytoscape as cyto
 import networkx as nx
 
-def nx_to_cytoscape(graph, colors):
+def nx_to_cytoscape(graph, colors, moods = None):
     """
     Converts a NetworkX graph into Cytoscape elements with conditional node coloring.
     :param graph: NetworkX graph.
@@ -18,14 +18,18 @@ def nx_to_cytoscape(graph, colors):
         #print(colors)
 
         # Determine grid position for 7x7 layout
-        row = node // 7
-        col = node % 7
-        position = {"x": col * 100, "y": row * 100}  # Scale the positions
+        row = node // 10
+        col = node % 10
+        position = {"x": col * 125, "y": row * 125}  # Scale the positions
 
         elements.append({
-            'data': {'id': str(node), 'label': f'Node {node}', 'color': color},
-            'position': position,
-            'classes': color
+            'data': {
+                'id': str(node),
+                'label': f'{node} | Mood: {moods[node]}' if moods else f'Node {node}',
+                'color': color,
+                'mood': moods[node] if moods else 'Bug'
+            },
+            'position': position
         })
 
     for edge in graph.edges():
@@ -36,7 +40,7 @@ def nx_to_cytoscape(graph, colors):
     return elements
 
 
-def grid_layout_positions(graph, grid_size=7):
+def grid_layout_positions(graph, grid_size=10):
     """Generate fixed positions for a 7x7 grid."""
     positions = {}
     for node in graph.nodes:
@@ -68,55 +72,19 @@ def cytoscape_with_layout(graph, colors):
         stylesheet=[
             {
                 "selector": "node",
-                "style": {"label": "data(label)"}
+                "style": 
+                {
+                "background-color": "data(color)",
+                "label": "data(label)",
+                "border-width": 2,
+                "border-color": "black",
+                "border-style": "solid"
+                }
             },
             {
                 "selector": "edge",
                 "style": {"line-color": "#ccc"}
-            },
-            {
-                "selector": ".red",
-                "style": {
-                    'background-color': 'red',
-                    'line-color': 'red'
-                }
-            },
-            {
-                "selector": ".blue",
-                "style": {
-                    'background-color': 'blue',
-                    'line-color': 'blue'
-                }
-            },
-            {
-                "selector": ".green",
-                "style": {
-                    'background-color': 'green',
-                    'line-color': 'green'
-                }
-            },
-            {
-                "selector": ".orange",
-                "style": {
-                    'background-color': 'orange',
-                    'line-color': 'orange'
-                }
-            },
-            {
-                "selector": ".pink",
-                "style": {
-                    'background-color': 'pink',
-                    'line-color': 'pink'
-                }
-            },
-            {
-                "selector": ".yellow",
-                "style": {
-                    'background-color': 'yellow',
-                    'line-color': 'yellow'
-                }
             }
-
         ]
     )
 
@@ -128,9 +96,12 @@ def create_dash_app(graph, colors):
     app.layout = html.Div([
         html.H1("Network Visualization"),
         html.Div(id="update-div"),
+        dcc.Store(id='mood-store', data={}),
+        dcc.Store(id='elements', data={}),
+        dcc.Store(id='color-store', data={}),
         dcc.Interval(
             id="update-interval",
-            interval=500,  # 2 seconds
+            interval=250,  # 2 seconds
             n_intervals=0
         ),
         cytoscape_with_layout(graph, colors)
@@ -138,11 +109,26 @@ def create_dash_app(graph, colors):
 
     @app.callback(
         dash.Output('cytoscape-graph', 'elements'),
-        [dash.Input('update-interval', 'n_intervals')]
+        dash.Output('color-store', 'data'),
+        [dash.Input('update-interval', 'n_intervals')],  # Triggers update
+        [dash.State('color-store', 'data')]  # Reads stored colors
     )
-    def update_graph(_):
-        """Update the graph whenever the callback is triggered."""
-        return nx_to_cytoscape(graph, colors)
+    def update_graph(_, stored_colors):
+        # print("Callback triggered")  # Debugging
+        stored_colors = app.layout.children[-2].data
+        stored_moods = app.layout.children[-3].data
+        if stored_colors:
+            #print("Stored colors in callback:", stored_colors)  # Debugging
+            return nx_to_cytoscape(graph, stored_colors, stored_moods), stored_colors
+        return nx_to_cytoscape(graph, colors), colors  # Fallback
+    
+    def update_graph_colors(new_colors):
+        global current_colors
+        current_colors = new_colors.copy() if new_colors else []
+        # The callback will handle updating the graph on next interval
+
+    # Attach the method to the app
+    app.update_graph_colors = update_graph_colors
 
     return app
 
