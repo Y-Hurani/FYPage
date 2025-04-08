@@ -3,7 +3,11 @@ from dash import dcc, html
 import dash_cytoscape as cyto
 import networkx as nx
 
-def nx_to_cytoscape(graph, colors, moods = None):
+# Global state variables
+CURRENT_COLORS = []
+CURRENT_MOODS = {}
+
+def nx_to_cytoscape(graph, colors, dimensions, moods = None):
     """
     Converts a NetworkX graph into Cytoscape elements with conditional node coloring.
     :param graph: NetworkX graph.
@@ -11,25 +15,26 @@ def nx_to_cytoscape(graph, colors, moods = None):
     :param agents: A dictionary of agents corresponding to the nodes.
     """
     elements = []
-
     for node in graph.nodes():
         # Default color
-        color = 'orange' if len(colors)<=node else colors[node]
-        #print(colors)
-
-        # Determine grid position for 7x7 layout
-        row = node // 10
-        col = node % 10
+        color = 'orange' if len(colors) <= node else colors[node]
+        
+        # Get mood if available
+        mood = None if not moods else moods[node]
+        
+        # Determine grid position
+        row = node // dimensions
+        col = node % dimensions
         position = {"x": col * 125, "y": row * 125}  # Scale the positions
-
         elements.append({
             'data': {
                 'id': str(node),
-                'label': f'{node} | Mood: {moods[node]}' if moods else f'Node {node}',
+                'label': f'{node} | Mood: {mood}' if moods else f'Node {node}',
                 'color': color,
-                'mood': moods[node] if moods else 'Bug'
+                'mood': mood
             },
-            'position': position
+            'position': position,
+            'classes': color  # Add this for CSS styling if needed
         })
 
     for edge in graph.edges():
@@ -40,20 +45,20 @@ def nx_to_cytoscape(graph, colors, moods = None):
     return elements
 
 
-def grid_layout_positions(graph, grid_size=10):
-    """Generate fixed positions for a 7x7 grid."""
+def grid_layout_positions(graph, dimensions):
+    """Generate fixed positions for a grid."""
     positions = {}
     for node in graph.nodes:
-        row = node // grid_size
-        col = node % grid_size
+        row = node // dimensions
+        col = node % dimensions
         positions[node] = {"x": col * 100, "y": row * 100}
     return positions
 
 
-def cytoscape_with_layout(graph, colors):
+def cytoscape_with_layout(graph, colors, dimensions):
     """Create a Dash Cytoscape component with a 7x7 grid layout."""
-    elements = nx_to_cytoscape(graph, colors)
-    positions = grid_layout_positions(graph)
+    elements = nx_to_cytoscape(graph, colors, dimensions)
+    positions = grid_layout_positions(graph, dimensions)
 
     layout = [
         {"data": {"id": str(node), "label": str(node)},
@@ -89,49 +94,56 @@ def cytoscape_with_layout(graph, colors):
     )
 
 
-def create_dash_app(graph, colors):
-    """Create and return a Dash app for the given NetworkX graph."""
+def create_dash_app(graph, colors, dimensions):
     app = dash.Dash(__name__)
+
+    # Initialize data cache for external updates
+    app.latest_data = {
+        'colors': colors.copy() if colors else [],
+        'moods': {}
+    }
+    
+    # Method for game loop to update data
+    def update_data(new_colors, new_moods):
+        app.latest_data['colors'] = new_colors
+        app.latest_data['moods'] = new_moods
+        print(f"Data updated: {len(new_colors)} colors, {len(new_moods)} moods")
+    
+    # Attach the method to the app
+    app.update_data = update_data
 
     app.layout = html.Div([
         html.H1("Network Visualization"),
         html.Div(id="update-div"),
         dcc.Store(id='mood-store', data={}),
-        dcc.Store(id='elements', data={}),
         dcc.Store(id='color-store', data={}),
         dcc.Interval(
             id="update-interval",
-            interval=250,  # 2 seconds
+            interval=500,  # Changed to 500ms for better performance
             n_intervals=0
         ),
-        cytoscape_with_layout(graph, colors)
+        cytoscape_with_layout(graph, colors, dimensions)
     ])
 
+    # CALLBACK 1: Sync data from app.latest_data to the stores
+    @app.callback(
+        [dash.Output('color-store', 'data'),
+         dash.Output('mood-store', 'data')],
+        [dash.Input('update-interval', 'n_intervals')]
+    )
+    def sync_data_to_stores(n_intervals):
+        return app.latest_data['colors'], app.latest_data['moods']
+
+    # CALLBACK 2: Update graph when store data changes
     @app.callback(
         dash.Output('cytoscape-graph', 'elements'),
-        dash.Output('color-store', 'data'),
-        [dash.Input('update-interval', 'n_intervals')],  # Triggers update
-        [dash.State('color-store', 'data')]  # Reads stored colors
+        [dash.Input('color-store', 'data'),
+         dash.Input('mood-store', 'data')]
     )
-    def update_graph(_, stored_colors):
-        # print("Callback triggered")  # Debugging
-        stored_colors = app.layout.children[-2].data
-        stored_moods = app.layout.children[-3].data
-        if stored_colors:
-            #print("Stored colors in callback:", stored_colors)  # Debugging
-            return nx_to_cytoscape(graph, stored_colors, stored_moods), stored_colors
-        return nx_to_cytoscape(graph, colors), colors  # Fallback
-    
-    def update_graph_colors(new_colors):
-        global current_colors
-        current_colors = new_colors.copy() if new_colors else []
-        # The callback will handle updating the graph on next interval
-
-    # Attach the method to the app
-    app.update_graph_colors = update_graph_colors
+    def update_graph(colors, moods):
+        return nx_to_cytoscape(graph, colors, dimensions, moods)
 
     return app
-
 
 # Example usage
 if __name__ == "__main__1":

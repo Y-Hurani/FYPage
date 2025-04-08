@@ -45,22 +45,36 @@ class MoodySARSAAgent(Agent):
         self.total_games += 1
         self.average_payoff += (payoff - self.average_payoff) / self.total_games
 
-    def after_game_function(self, state, action, reward, opponent_reward, opponent_id, opponent_average):
+    def after_game_function(self, state, action, next_state, next_action, reward, opponent_reward, opponent_id):
         self.update_q_value(state, action, reward, opponent_id)
         self.update_mood(opponent_id, reward, opponent_reward)
         self.update_memory(opponent_id, reward)
-
-    def update_mood(self, opponent_id, reward, opponent_reward):
-        """
-        Adjust mood based on self-performance and fairness using opponent's payoff history.
-        """
+        self.update_average_payoff(reward)
+    
+    def calculate_new_omega(self, opponent_id, reward, opponent_reward):
         avg_self_reward = self.average_reward(opponent_id)
 
         # Calculate average rewards including the new payoff
         self_payoffs = self.memories[opponent_id]
+        opponent_payoffs = []
+        for rewarded in self_payoffs:
+            match rewarded:
+                case 0:
+                    opponent_payoffs.append(5)
+                    break
+                case 1:
+                    opponent_payoffs.append(1)
+                    break
+                case 3:
+                    opponent_payoffs.append(3)
+                    break
+                case 5:
+                    opponent_payoffs.append(0)
+                    break
+
         avg_self_reward_t = np.mean(self_payoffs[-19:] + [reward]) if self_payoffs else reward
 
-        opponent_payoffs = agents[opponent_id].memories[self.id]
+        #opponent_payoffs = agents[opponent_id].memories[self.id]
         avg_opponent_reward_t = np.mean(opponent_payoffs[-19:] + [opponent_reward]) if opponent_payoffs else opponent_reward
 
         """avg_self_reward = self.average_payoff
@@ -72,11 +86,13 @@ class MoodySARSAAgent(Agent):
         alpha = (100 - self.mood) / 100
         beta = alpha
         omega = avg_self_reward_t - (alpha * max(avg_opponent_reward_t - avg_self_reward_t, 0)) - (beta * max(avg_self_reward_t - avg_opponent_reward_t, 0))
-        #print((reward - avg_self_reward) + self.prev_omegas[opponent_id])
-        # Update mood
-        #print(self.mood + (reward - avg_self_reward))
-        if self.prev_omegas[opponent_id] > reward:
-            self.prev_omegas[opponent_id] *= 1
+        return omega
+
+    def update_mood(self, opponent_id, reward, opponent_reward):
+        """
+        Adjust mood based on self-performance and fairness using opponent's payoff history.
+        """
+        omega = self.calculate_new_omega(opponent_id, reward, opponent_reward)
         self.mood += int(reward - self.prev_omegas[opponent_id])
         self.mood = max(0, min(99, self.mood))  # Clamp mood to [1, 100]
         self.prev_omegas[opponent_id] = omega
@@ -146,7 +162,6 @@ class MoodySARSAAgent(Agent):
         else:
             self.memories[opponent_id].pop(0)
             self.memories[opponent_id].append(reward)
-        self.update_average_payoff(reward)
 
     def average_reward(self, opponent_id, cap=20):
         if len(self.memories[opponent_id]) == 0:
@@ -226,9 +241,6 @@ def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     Plays one game of IPD between two agents, retrieving states from the environment.
     """
 
-    # Retrieve current states from the environment
-    # state_A = env.trust_levels[id_A][id_B]
-    # state_B = env.trust_levels[id_B][id_A]
 
     state_A = agent_A.mood if isinstance(agent_A, MoodySARSAAgent) else 50
     state_B = agent_B.mood if isinstance(agent_B, MoodySARSAAgent) else 50
@@ -240,17 +252,20 @@ def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     # Step in the environment to get next states and rewards
     (reward_A, reward_B) = env.step(id_A, id_B, action_A, action_B)
 
+    next_state_A = max(0, min(99, agent_A.mood + int(reward_A - agent_A.prev_omegas[agent_B.id]))) if isinstance(agent_A, MoodySARSAAgent) else 50
+    next_state_B = max(0, min(99, agent_B.mood + int(reward_B - agent_B.prev_omegas[agent_A.id]))) if isinstance(agent_B, MoodySARSAAgent) else 50
+
     # Agents choose next actions
-    # next_action_A = agent_A.choose_action(next_state_A, id_B, fixed)
-    # next_action_B = agent_B.choose_action(next_state_B, id_A, fixed)
+    next_action_A = agent_A.choose_action(next_state_A, id_B, fixed)
+    next_action_B = agent_B.choose_action(next_state_B, id_A, fixed)
 
     # Calculate new average payoffs
-    new_average_A = agent_A.average_payoff + ((reward_A - agent_A.average_payoff)/(agent_A.total_games + 1))
-    new_average_B = agent_B.average_payoff + ((reward_B - agent_B.average_payoff) / (agent_B.total_games + 1))
+    new_average_A = agent_A.average_payoff + ((reward_A - agent_A.average_payoff) / (agent_A.total_games + 1)) 
+    new_average_B = agent_B.average_payoff + ((reward_B - agent_B.average_payoff) / (agent_B.total_games + 1)) 
 
     # Update Q-values for both agents
-    agent_A.after_game_function(state_A, action_A, reward_A, reward_B, id_B, new_average_B)
-    agent_B.after_game_function(state_B, action_B, reward_B, reward_A, id_A, new_average_A)
+    agent_A.after_game_function(state_A, action_A, next_state_A, next_action_A, reward_A, reward_B, id_B)
+    agent_B.after_game_function(state_B, action_B, next_state_B, next_action_B, reward_B, reward_A, id_A)
 
 
     # Update the trust states in the environment
@@ -387,8 +402,9 @@ def update_colors_moods():
     return colors, moods
 
 # Create a graph and visualize it
-num_nodes = 100
+num_nodes = 400
 num_edges = 50
+dimensions = int(math.sqrt(num_nodes))
 max_connection_distance = 225
 graph = create_networkx_graph(num_nodes=num_nodes, num_edges=num_edges)
 # Initiate variables
@@ -406,7 +422,7 @@ weights = {
 
 agents = generate_agents(n_agents, weights, n_states, n_actions)
 colors, moods = update_colors_moods()
-visualize(graph, int(math.sqrt(num_nodes)))
+visualize(graph, dimensions)
 add_nodes_to_graph(graph)
 #agents = [MoodySARSAAgent(n_states=n_states, n_actions=n_actions, n_agents=n_agents, id=_) for _ in range(n_agents)]
 #agents[24] = CooperativeAgent(id=24, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
@@ -415,7 +431,7 @@ add_nodes_to_graph(graph)
 env = PrisonersDilemmaEnvironment(n_agents=n_agents, n_states=n_states)
 
 # pair matches
-num_games_per_pair = 24999
+num_games_per_pair = 249999
 removed_edges_list = []
 reconstruction_interval = 10  # Number of rounds before reconstruction
 percent_reconnection = 0.20  # 10% of the population for random reconnection
@@ -423,18 +439,14 @@ average_considered_betrayal = 2.5
 
 
 # Start the Dash app in a separate thread or process
-app = create_dash_app(graph, colors)
+app = create_dash_app(graph, colors, dimensions)
 
 # Start Dash server in thread
 thread = threading.Thread(target=lambda: app.run(debug=True, use_reloader=False))
 thread.daemon = True
 thread.start()
-
-
 possible_pairs = [(a, b) for a in range(n_agents) for b in range(a + 1, n_agents)]
 subset_size = int(len(possible_pairs) * percent_reconnection)
-
-
 
 # game loop to update the Dash graph
 for i in range(num_games_per_pair):
@@ -447,7 +459,7 @@ for i in range(num_games_per_pair):
         print(env.total)
         env.reset()
         for agent in agents:
-            if isinstance(agent, MoodySARSAAgent):
+            if isinstance(agent, MoodySARSAAgent) or isinstance(agent, SARSAAgent):
                 agent.betrayal_memory.clear()
 
     if (i + 1) % reconstruction_interval == 0:
@@ -481,10 +493,9 @@ for i in range(num_games_per_pair):
         # Trigger Dash Cytoscape to redraw the updated graph
         # This replaces `network_visualization.show("network.html")`
         colors, moods = update_colors_moods()
-        elements = nx_to_cytoscape(graph, colors, moods)
+        elements = nx_to_cytoscape(graph, colors, dimensions, moods)
         app.layout.children[-1].elements = elements
-        app.layout.children[-2].data = colors
-        app.layout.children[-3].data = moods
+        app.update_data(colors, moods)
         for agent in agents:
             if isinstance(agent, MoodySARSAAgent):
                 agent.set_epsilon(agent.epsilon * 0.9995)
