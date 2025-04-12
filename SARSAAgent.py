@@ -1,5 +1,7 @@
 import numpy as np
 import random
+from collections import deque
+
 
 class SARSAAgent:
     def __init__(self, n_states, n_actions, n_agents, id, alpha=0.1, gamma=0.9, epsilon=0.1):
@@ -13,7 +15,7 @@ class SARSAAgent:
         # Q-tables for each opponent agent
         self.q_tables = {i: np.zeros((n_states, n_actions)) for i in range(n_agents)}
         self.total_games, self.average_payoff = 0, 0
-        self.betrayal_memory = set()  # Track agents that betrayed this agent
+        self.betrayal_memory = deque() 
 
         # Memory dictionary: key = opponent_id, value = list of last 20 moves/rewards
         self.memories = {i: []
@@ -53,7 +55,7 @@ class SARSAAgent:
     def keep_connected_to_opponent(self, opponent_id, average_considered_betrayal, round=50):
         avg_A = self.average_reward(opponent_id)  # Avg payoff against opponent
         if avg_A < average_considered_betrayal:
-            self.betrayal_memory.add(opponent_id)  # A Add B to list of betrayers
+            self.betrayal_memory.append(opponent_id)  # A Add B to list of betrayers
             return 0
         else:
             return 1

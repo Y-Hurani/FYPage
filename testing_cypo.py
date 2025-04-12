@@ -48,10 +48,12 @@ def nx_to_cytoscape(graph, colors, dimensions, moods = None):
 def grid_layout_positions(graph, dimensions):
     """Generate fixed positions for a grid."""
     positions = {}
+    offset = 50
     for node in graph.nodes:
         row = node // dimensions
         col = node % dimensions
-        positions[node] = {"x": col * 100, "y": row * 100}
+        positions[node] = {"x": (col * 100 + offset), "y": (row * 100 + offset)}
+        offset *= -1
     return positions
 
 
@@ -73,6 +75,8 @@ def cytoscape_with_layout(graph, colors, dimensions):
         id='cytoscape-graph',
         elements=layout,
         layout={"name": "preset"},
+        zoom=3,
+        pan={'x': 0, 'y': 0},
         style={"width": "100%", "height": "500px"},
         stylesheet=[
             {
@@ -136,12 +140,16 @@ def create_dash_app(graph, colors, dimensions):
 
     # CALLBACK 2: Update graph when store data changes
     @app.callback(
-        dash.Output('cytoscape-graph', 'elements'),
+        [dash.Output('cytoscape-graph', 'elements'),
+        dash.Output('cytoscape-graph', 'zoom'),
+        dash.Output('cytoscape-graph', 'pan')],
         [dash.Input('color-store', 'data'),
-         dash.Input('mood-store', 'data')]
+        dash.Input('mood-store', 'data')],
+        [dash.State('cytoscape-graph', 'zoom'),
+        dash.State('cytoscape-graph', 'pan')]
     )
-    def update_graph(colors, moods):
-        return nx_to_cytoscape(graph, colors, dimensions, moods)
+    def update_graph(colors, moods, zoom, pan):
+        return nx_to_cytoscape(graph, colors, dimensions, moods), zoom, pan
 
     return app
 

@@ -1,5 +1,5 @@
 import time
-
+from collections import deque
 import numpy as np
 import random
 import networkx as nx
@@ -23,7 +23,7 @@ class MoodySARSAAgent(Agent):
         self.alpha = alpha  # Learning rate
         self.gamma = gamma  # Discount factor gamma
         self.epsilon = epsilon  # Exploration
-        self.betrayal_memory = set()  # Track agents that betrayed this agent
+        self.betrayal_memory = deque()
         self.mood = 50 # random.uniform(1, 99)  # Mood value (1 to 100, neutral mood = 50)
         self.prev_omegas = {i: 0 for i in range(n_agents)}
         self.total_games = 0  # Number of games played so far
@@ -138,9 +138,9 @@ class MoodySARSAAgent(Agent):
         if random.uniform(0, 1) < decision_epsilon:  # Random chance based on epsilon to choose randomly instead
             #chosen_action = random.choice(range(self.n_actions))  # Explore random choice
             if self.mood > 90:
-                chosen_action = random.choices(population=range(self.n_actions), weights=[0.25, 0.75])[0]
+                chosen_action = random.choices(population=range(self.n_actions), weights=[0.5, 0.5])[0]
             else:
-                chosen_action = random.choices(population=range(self.n_actions), weights=[0.4, 0.6])[0]
+                chosen_action = random.choices(population=range(self.n_actions), weights=[0.5, 0.5])[0]
             #print(chosen_action, chosen_action2)
         return chosen_action
 
@@ -172,7 +172,7 @@ class MoodySARSAAgent(Agent):
     def keep_connected_to_opponent(self, opponent_id, average_considered_betrayal, round=50):
         avg_A = self.average_reward(opponent_id)  # Avg payoff against opponent
         if avg_A < average_considered_betrayal:
-            self.betrayal_memory.add(opponent_id)  # A Add B to list of betrayers
+            self.betrayal_memory.append(opponent_id)  # A Add B to list of betrayers
             return 0
         else:
             return 1
@@ -401,8 +401,20 @@ def update_colors_moods():
             colors.append('yellow')
     return colors, moods
 
+def trigger_forgiveness(mode):
+    if mode == 'WIPE':
+        for agent in agents:
+            if isinstance(agent, MoodySARSAAgent) or isinstance(agent, SARSAAgent):
+                agent.betrayal_memory.clear()
+    elif mode == 'POP':
+        for agent in agents:
+            if isinstance(agent, MoodySARSAAgent) or isinstance(agent, SARSAAgent):
+                if len(agent.betrayal_memory) > 10:
+                    agent.betrayal_memory.popleft()
+
+
 # Create a graph and visualize it
-num_nodes = 400
+num_nodes = 100
 num_edges = 50
 dimensions = int(math.sqrt(num_nodes))
 max_connection_distance = 225
@@ -433,9 +445,9 @@ env = PrisonersDilemmaEnvironment(n_agents=n_agents, n_states=n_states)
 # pair matches
 num_games_per_pair = 249999
 removed_edges_list = []
-reconstruction_interval = 10  # Number of rounds before reconstruction
-percent_reconnection = 0.20  # 10% of the population for random reconnection
-average_considered_betrayal = 2.5
+reconstruction_interval = 10  # number of rounds before reconstruction
+percent_reconnection = 0.20  # % of the population for random reconnection
+average_considered_betrayal = 3
 
 
 # Start the Dash app in a separate thread or process
@@ -455,12 +467,10 @@ for i in range(num_games_per_pair):
     if fixed >= 1:
         fixed = fixed - 1
 
-    if (i + 1) % (reconstruction_interval * 100) == 1:
+    if (i + 1) % (reconstruction_interval * 10) == 1:
         print(env.total)
         env.reset()
-        for agent in agents:
-            if isinstance(agent, MoodySARSAAgent) or isinstance(agent, SARSAAgent):
-                agent.betrayal_memory.clear()
+        trigger_forgiveness('POP')
 
     if (i + 1) % reconstruction_interval == 0:
         print(f"Reconstruction event at iteration {i + 1}")
@@ -499,3 +509,4 @@ for i in range(num_games_per_pair):
         for agent in agents:
             if isinstance(agent, MoodySARSAAgent):
                 agent.set_epsilon(agent.epsilon * 0.9995)
+        time.sleep(0.1)
