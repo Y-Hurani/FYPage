@@ -111,7 +111,6 @@ def create_dash_app(graph, colors, dimensions):
     def update_data(new_colors, new_moods):
         app.latest_data['colors'] = new_colors
         app.latest_data['moods'] = new_moods
-        print(f"Data updated: {len(new_colors)} colors, {len(new_moods)} moods")
     
     # Attach the method to the app
     app.update_data = update_data

@@ -1,9 +1,9 @@
 import numpy as np
 import random
+from Agent import Agent
 from collections import deque
 
-
-class SARSAAgent:
+class SARSAAgent(Agent):
     def __init__(self, n_states, n_actions, n_agents, id, alpha=0.1, gamma=0.9, epsilon=0.1):
         self.id = id
         self.n_states = n_states

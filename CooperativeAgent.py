@@ -16,7 +16,7 @@ class CooperativeAgent(Agent):
         """
         return 1
 
-    def after_game_function(self, state, action, reward, opponent_reward, opponent_id, opponent_average, **kwargs):
+    def after_game_function(self, reward, opponent_id, *args):
         self.update_memory(opponent_id, reward)
 
     def reset(self):
