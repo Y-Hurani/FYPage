@@ -2,7 +2,9 @@ import math
 import random
 import numpy as np
 from Agent import Agent
+from DefectingAgent import DefectingAgent
 from collections import deque
+
 
 class MoodySARSAAgent(Agent):
     def __init__(self, n_states, n_actions, n_agents, id, alpha=0.1, gamma=0.95, epsilon=0.1):
@@ -74,7 +76,7 @@ class MoodySARSAAgent(Agent):
         # Calculate alpha and omega (Homo Egualis adjustment)
         alpha = (100 - self.mood) / 100
         beta = alpha
-        omega = avg_self_reward_t - (alpha * max(avg_opponent_reward_t - avg_self_reward_t, 0)) - (beta * max(avg_self_reward_t - avg_opponent_reward_t, 0))
+        omega = avg_self_reward_t - (0 * max(avg_opponent_reward_t - avg_self_reward_t, 0)) - (beta * max(avg_self_reward_t - avg_opponent_reward_t, 0))
         return omega
 
     def update_mood(self, opponent_id, reward, opponent_reward):
@@ -159,6 +161,10 @@ class MoodySARSAAgent(Agent):
             return np.mean(self.memories[opponent_id][:cap])
 
     def keep_connected_to_opponent(self, opponent_id, average_considered_betrayal, round=50):
+        # DefectingAgent stay connected
+        if opponent_id in range(110, 120):
+            return 1
+
         avg_A = self.average_reward(opponent_id)  # Avg payoff against opponent
         if avg_A < average_considered_betrayal:
             self.betrayal_memory.append(opponent_id)  # A Add B to list of betrayers

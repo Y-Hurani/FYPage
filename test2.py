@@ -254,10 +254,10 @@ def trigger_forgiveness(mode):
 
 
 # Create a graph and visualize it
-num_nodes = 120
+num_nodes = 100
 num_edges = 50
 dimensions = int(math.sqrt(num_nodes))
-max_connection_distance = 225
+max_connection_distance = 250
 graph = create_networkx_graph(num_nodes=num_nodes, num_edges=num_edges)
 # Initiate variables
 n_agents = num_nodes
@@ -282,13 +282,15 @@ add_nodes_to_graph(graph)
 #agents[5] = DefectingAgent(id=5, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
 env = PrisonersDilemmaEnvironment(n_agents=n_agents, n_states=n_states)
 
+'''
 for x in range(10):
     agents[x] = CooperativeAgent(id=x, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
     y = x + 110
     agents[y] = DefectingAgent(id=y, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
+'''
 
 # pair matches
-num_games_per_pair = 249999
+num_games_per_pair = 99999
 removed_edges_list = []
 reconstruction_interval = 10  # number of rounds before reconstruction
 percent_reconnection = 0.20  # % of the population for random reconnection

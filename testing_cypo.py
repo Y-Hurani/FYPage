@@ -15,6 +15,7 @@ def nx_to_cytoscape(graph, colors, dimensions, moods = None):
     :param agents: A dictionary of agents corresponding to the nodes.
     """
     elements = []
+    offset = 12.5
     for node in graph.nodes():
         # Default color
         color = 'orange' if len(colors) <= node else colors[node]
@@ -25,7 +26,8 @@ def nx_to_cytoscape(graph, colors, dimensions, moods = None):
         # Determine grid position
         row = node // dimensions
         col = node % dimensions
-        position = {"x": col * 125, "y": row * 125}  # Scale the positions
+        position = {"x": col * 125 + (row % 2) * offset, "y": row * 125 + (col % 2) * offset}  # Scale the positions
+        #offset -= (offset * 2) - 25
         elements.append({
             'data': {
                 'id': str(node),
