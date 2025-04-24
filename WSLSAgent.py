@@ -1,14 +1,15 @@
 import numpy as np
 from Agent import Agent
 
-class TFTAgent(Agent):
+
+class WSLSAgent(Agent):
     def __init__(self, id, n_states, n_actions, n_agents):
         super().__init__(id, n_states, n_actions, n_agents)
         self.last_opponent_actions = {i: 1 for i in range(n_agents)}  # Default to cooperation (action=1)
 
     def choose_action(self, state, opponent_id, *args):
         """
-        TFT logic: Mirror the opponent's last action.
+        WSLS logic: Stick with winning move, otherwise switch.
         """
         return self.last_opponent_actions[opponent_id]
 
@@ -17,13 +18,11 @@ class TFTAgent(Agent):
         Update the agent's behavior after a game round.
         """
         # Track opponent's last action based on received rewards.
-        if opponent_reward in {3, 0}:  # Cooperation rewards
-            self.last_opponent_actions[opponent_id] = 1  # Cooperate
-        elif opponent_reward in {5, 1}:  # Defection rewards
-            self.last_opponent_actions[opponent_id] = 0  # Defect
+        if opponent_reward in {5, 1}:  # Defection rewards
+            current_value = self.last_opponent_actions[opponent_id]
+            self.last_opponent_actions[opponent_id] = 1 - current_value # Flip the Value
 
         self.update_memory(opponent_id, reward)
-        self.update_average_payoff(reward)
 
         # Update average payoff
         self.total_games += 1
@@ -43,5 +42,4 @@ class TFTAgent(Agent):
             return 0
         else:
             return 1
-
 

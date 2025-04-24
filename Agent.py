@@ -20,7 +20,10 @@ class Agent:
             self.memories[opponent_id].pop(0)
             self.memories[opponent_id].append(reward)
 
-
+    def update_average_payoff(self, payoff):
+        self.total_games += 1
+        self.average_payoff += (payoff - self.average_payoff) / self.total_games
+        
     def choose_action(self, state, opponent_id, **kwargs):
         """
         Select an action given the current state and opponent.

@@ -43,7 +43,7 @@ class MoodySARSAAgent(Agent):
         self.update_average_payoff(reward)
     
     def calculate_new_omega(self, opponent_id, reward, opponent_reward):
-        avg_self_reward = self.average_reward(opponent_id)
+        # avg_self_reward = self.average_reward(opponent_id)
 
         # Calculate average rewards including the new payoff
         self_payoffs = self.memories[opponent_id]
@@ -76,7 +76,7 @@ class MoodySARSAAgent(Agent):
         # Calculate alpha and omega (Homo Egualis adjustment)
         alpha = (100 - self.mood) / 100
         beta = alpha
-        omega = avg_self_reward_t - (0 * max(avg_opponent_reward_t - avg_self_reward_t, 0)) - (beta * max(avg_self_reward_t - avg_opponent_reward_t, 0))
+        omega = avg_self_reward_t - (alpha * max(avg_opponent_reward_t - avg_self_reward_t, 0)) - (beta * max(avg_self_reward_t - avg_opponent_reward_t, 0))
         return omega
 
     def update_mood(self, opponent_id, reward, opponent_reward):
@@ -85,7 +85,7 @@ class MoodySARSAAgent(Agent):
         """
         omega = self.calculate_new_omega(opponent_id, reward, opponent_reward)
         self.mood += int(reward - self.prev_omegas[opponent_id])
-        self.mood = max(0, min(99, self.mood))  # Clamp mood to [1, 100]
+        self.mood = max(0, min(100, self.mood))  # Clamp mood to [1, 100]
         self.prev_omegas[opponent_id] = omega
 
     def compute_mood_adjusted_estimate(self, opponent_id):
@@ -95,11 +95,6 @@ class MoodySARSAAgent(Agent):
         memory = self.memories[opponent_id]
         if not memory:
             return 0
-
-        '''# Use a portion of memory based on mood
-        mood_factor = (100 - self.mood) / 100  # Higher mood uses less memory (alpha)
-        memory_slice = math.ceil(len(memory) / mood_factor)
-        relevant_memory = memory[-memory_slice:] if memory_slice > 0 else memory'''
 
         mood_factor = (100 - self.mood) / 100  # Scales between 0 and 1
         max_depth = 20  # Set the maximum depth of memory to consider
@@ -162,8 +157,8 @@ class MoodySARSAAgent(Agent):
 
     def keep_connected_to_opponent(self, opponent_id, average_considered_betrayal, round=50):
         # DefectingAgent stay connected
-        if opponent_id in range(110, 120):
-            return 1
+        # if opponent_id in range(110, 120):
+        #    return 1
 
         avg_A = self.average_reward(opponent_id)  # Avg payoff against opponent
         if avg_A < average_considered_betrayal:
@@ -171,3 +166,5 @@ class MoodySARSAAgent(Agent):
             return 0
         else:
             return 1
+
+bingy = deque()

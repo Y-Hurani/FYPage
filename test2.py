@@ -8,6 +8,7 @@ from pyvis.network import Network
 from Agent import Agent
 from CooperativeAgent import CooperativeAgent
 from TFTAgent import TFTAgent
+from WSLSAgent import WSLSAgent
 from DefectingAgent import DefectingAgent
 from SARSAAgent import SARSAAgent
 from AgentTracker import AgentTracker
@@ -112,7 +113,7 @@ def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     # env.trust_levels[id_A][id_B] = next_state_A
     # env.trust_levels[id_B][id_A] = next_state_B
 
-node_positions = {} # For Pyvis illustration (Coordinates of each node)
+node_positions = {} # Coordinates of each node
 def calculate_distance(node_a, node_b, positions=node_positions):
     """
     Calculate Euclidean distance between two nodes.
@@ -145,7 +146,7 @@ def agent_class_condition(node, agents):
     else:
         return 'orange'  # Default color for other classes
 
-def add_nodes_to_graph(graph):
+def add_edges_to_graph(graph):
     # Randomly create edges between nodes
     while graph.number_of_edges() < num_edges:
         node_a = random.randint(0, num_nodes - 1)
@@ -193,7 +194,8 @@ def generate_agents(n_agents, weights, n_states, n_actions):
         "SARSAAgent": SARSAAgent,
         "CooperativeAgent": CooperativeAgent,
         "DefectingAgent": DefectingAgent,
-        "TFTAgent": TFTAgent
+        "TFTAgent": TFTAgent,
+        "WSLSAgent": WSLSAgent
     }
 
     # Normalize weights to sum to 1
@@ -233,12 +235,14 @@ def update_colors_moods():
         elif isinstance(agent, MoodySARSAAgent):
             colors.append(mood_to_color(agent.mood))
             moods[-1] = agent.mood
+        elif isinstance(agent, SARSAAgent):
+            colors.append('yellow')
         elif isinstance(agent, TFTAgent):
             colors.append('pink')
         elif isinstance(agent, DefectingAgent):
             colors.append('red')
         else:
-            colors.append('yellow')
+            colors.append('orange')
     return colors, moods
 
 def trigger_forgiveness(mode):
@@ -249,8 +253,46 @@ def trigger_forgiveness(mode):
     elif mode == 'POP':
         for agent in agents:
             if isinstance(agent, MoodySARSAAgent) or isinstance(agent, SARSAAgent):
-                if len(agent.betrayal_memory) > 10:
+                if len(agent.betrayal_memory) > 0:
                     agent.betrayal_memory.popleft()
+    else:
+        print('No applicable mode')
+
+def calculate_max_degrees(graph, max_connection_distance, positions=node_positions):
+    """
+    Calculate maximum possible degree for each node based on distance constraints.
+    
+    Args:
+        graph: NetworkX graph object
+        max_connection_distance: Maximum allowed distance between connected nodes
+        positions: Dictionary mapping node IDs to their (x, y) coordinates
+        
+    Returns:
+        Dictionary mapping each node ID to its maximum possible degree
+    """
+    max_degrees = {}
+    
+    # For each node in the graph
+    for node_a in graph.nodes():
+        # Count how many other nodes are within the max connection distance
+        possible_connections = 0
+        
+        for node_b in graph.nodes():
+            # Skip self
+            if node_a == node_b:
+                continue
+                
+            # Calculate distance between nodes
+            distance = calculate_distance(node_a, node_b, positions)
+            
+            # If distance is within limit, this is a possible connection
+            if distance < max_connection_distance:
+                possible_connections += 1
+                
+        # Store the maximum possible degree for this node
+        max_degrees[node_a] = possible_connections
+        
+    return max_degrees
 
 
 # Create a graph and visualize it
@@ -261,21 +303,22 @@ max_connection_distance = 250
 graph = create_networkx_graph(num_nodes=num_nodes, num_edges=num_edges)
 # Initiate variables
 n_agents = num_nodes
-n_states = 100
+n_states = 101
 n_actions = 2  # Actions: 0 = defect, 1 = coop
 fixed = 0
 weights = {
-    "SARSAAgent": 0.0,
-    "MoodySARSAAgent": 1.0,
+    "SARSAAgent": 0.25,
+    "MoodySARSAAgent": 0.25,
     "CooperativeAgent": 0.00,  
     "DefectingAgent": 0.00,  
-    "TFTAgent": 0.00
+    "TFTAgent": 0.25,
+    "WSLSAgent": 0.25
 }
 
 agents = generate_agents(n_agents, weights, n_states, n_actions)
 colors, moods = update_colors_moods()
 visualize(graph, dimensions)
-add_nodes_to_graph(graph)
+add_edges_to_graph(graph)
 #agents = [MoodySARSAAgent(n_states=n_states, n_actions=n_actions, n_agents=n_agents, id=_) for _ in range(n_agents)]
 #agents[24] = CooperativeAgent(id=24, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
 #agents[1] = TFTAgent(id=1, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
@@ -290,11 +333,11 @@ for x in range(10):
 '''
 
 # pair matches
-num_games_per_pair = 99999
+num_games_per_pair = 50000
 removed_edges_list = []
 reconstruction_interval = 10  # number of rounds before reconstruction
 percent_reconnection = 0.20  # % of the population for random reconnection
-average_considered_betrayal = 3
+average_considered_betrayal = 2.5
 
 
 # Start the Dash app in a separate thread or process
@@ -303,59 +346,74 @@ thread = threading.Thread(target=lambda: app.run(debug=True, use_reloader=False)
 thread.daemon = True
 thread.start()
 possible_pairs = [(a, b) for a in range(n_agents) for b in range(a + 1, n_agents)]
+max_degrees = calculate_max_degrees(graph, max_connection_distance)
+print(max_degrees)
 subset_size = int(len(possible_pairs) * percent_reconnection)
 
 # Initialize tracking class AgentTracker
-tracker = AgentTracker(agents, dimensions, 100)
+tracker = AgentTracker(agents, dimensions, 100, max_degrees)
+
 
 # game loop to update the Dash graph
-for i in range(num_games_per_pair):
-    for edge in graph.edges():
-        play_game(agents[edge[0]], agents[edge[1]], env, edge[0], edge[1], fixed)
-    if fixed >= 1:
-        fixed = fixed - 1
-    if (i + 1) % (reconstruction_interval * 10) == 1:
-        tracker.track_metrics()
-    if (i + 1) % (reconstruction_interval * 100) == 1:
-        print(env.total)
-        env.reset()
-        trigger_forgiveness('WIPE')
+for percentage_spread in [250]:
+    #sarsa_spread = percentage_spread * 0.10
+    #weights['SARSAAgent'] = sarsa_spread
+    #weights['MoodySARSAAgent'] = 1 - sarsa_spread
+    max_connection_distance = percentage_spread
+    agents = generate_agents(n_agents, weights, n_states, n_actions)
+    tracker = AgentTracker(agents, dimensions, 100, max_degrees)
+    tracker.csv_path_mood = f"stats/agent_mood_by_layer_{percentage_spread}.csv"
+    tracker.csv_path_score = f"stats/agent_mood_by_layer_{percentage_spread}.csv"
+    for i in range(num_games_per_pair):
+        for edge in graph.edges():
+            play_game(agents[edge[0]], agents[edge[1]], env, edge[0], edge[1], fixed)
+        if fixed >= 1:
+            fixed = fixed - 1
 
-    if (i + 1) % reconstruction_interval == 0:
-        print(f"Reconstruction event at iteration {i + 1}")
+        if (i + 1) % (reconstruction_interval * 10) == 1:
+            current_degrees = {node: graph.degree(node) for node in graph.nodes()}
+            tracker.track_types_metrics(current_degrees)
+            
+        if (i + 1) % (reconstruction_interval * 100) == 1:
+            print(env.total)
+            env.reset()
+            trigger_forgiveness('WIPE')
+            
+        if (i + 1) % reconstruction_interval == 0:
+            print(f"Reconstruction event at iteration {i + 1}")
 
-        evaluated_pairs = random.sample(possible_pairs, subset_size)
+            evaluated_pairs = random.sample(possible_pairs, subset_size)
 
-        for agent_a, agent_b in evaluated_pairs:
-            distance = calculate_distance(agent_b, agent_a)
-            if distance > max_connection_distance:
-                continue
-            if graph.has_edge(agent_a, agent_b):
-                decision_a = agents[agent_a].keep_connected_to_opponent(agent_b, average_considered_betrayal, i)
-                decision_b = agents[agent_b].keep_connected_to_opponent(agent_a, average_considered_betrayal, i)
-                if decision_a == 0:# or decision_b == 0:
-                    graph.remove_edge(agent_a, agent_b)
-            else:
-                # If either of the agents are moody and hold grudge against opponent, dont connect
-                condition_A, condition_B = True, True
-                if isinstance(agent_a, MoodySARSAAgent):
-                    if agent_b in agents[agent_a].betrayal_memory:
-                        condition_A = False
+            for agent_a, agent_b in evaluated_pairs:
+                distance = calculate_distance(agent_b, agent_a)
+                if distance > max_connection_distance:
+                    continue
+                if graph.has_edge(agent_a, agent_b):
+                    decision_a = agents[agent_a].keep_connected_to_opponent(agent_b, average_considered_betrayal, i)
+                    decision_b = agents[agent_b].keep_connected_to_opponent(agent_a, average_considered_betrayal, i)
+                    if decision_a == 0:# or decision_b == 0:
+                        graph.remove_edge(agent_a, agent_b)
+                else:
+                    # If either of the agents are moody and hold grudge against opponent, dont connect
+                    condition_A, condition_B = True, True
+                    if isinstance(agents[agent_a], MoodySARSAAgent) or isinstance(agents[agent_a], SARSAAgent):
+                        if agent_b in agents[agent_a].betrayal_memory:
+                            condition_A = False
 
-                if isinstance(agent_b, MoodySARSAAgent):
-                    if agent_a in agents[agent_b].betrayal_memory:
-                        condition_B = False
+                    if isinstance(agents[agent_b], MoodySARSAAgent) or isinstance(agents[agent_b], SARSAAgent):
+                        if agent_a in agents[agent_b].betrayal_memory:
+                            condition_B = False
 
-                if condition_A and condition_B:
-                    graph.add_edge(agent_a, agent_b)
+                    if condition_A and condition_B:
+                        graph.add_edge(agent_a, agent_b)
 
-        # Trigger Dash Cytoscape to redraw the updated graph
-        # This replaces `network_visualization.show("network.html")`
-        colors, moods = update_colors_moods()
-        elements = nx_to_cytoscape(graph, colors, dimensions, moods)
-        app.layout.children[-1].elements = elements
-        app.update_data(colors, moods)
-        for agent in agents:
-            if isinstance(agent, MoodySARSAAgent):
-                agent.set_epsilon(agent.epsilon * 0.9995)
-        #time.sleep(0.1)
+            # Trigger Dash Cytoscape to redraw the updated graph
+            # This replaces `network_visualization.show("network.html")`
+            colors, moods = update_colors_moods()
+            elements = nx_to_cytoscape(graph, colors, dimensions, moods)
+            app.layout.children[-1].elements = elements
+            app.update_data(colors, moods)
+            #for agent in agents:
+            #    if isinstance(agent, MoodySARSAAgent):
+            #        agent.set_epsilon(agent.epsilon * 0.9995)
+            time.sleep(0.05)
