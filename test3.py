@@ -6,7 +6,6 @@ import numpy as np
 import random
 import networkx as nx
 import math
-from pyvis.network import Network
 from Agent import Agent
 from CooperativeAgent import CooperativeAgent
 from TFTAgent import TFTAgent
@@ -166,8 +165,6 @@ def add_edges_to_graph(graph, num_edges, num_nodes, positions, max_connection_di
     return graph
 
 def visualize(graph, grid_size=7):
-    net = Network(notebook=True, directed=False, cdn_resources='remote')  # Non-directed graph
-
     # Define fixed positions for the nodes in a grid
     for node in graph.nodes:
         row = node // grid_size
@@ -359,7 +356,9 @@ def main(app, graph, config):
     reconstruction_interval = 10
     percent_reconnection = config["percent_reconnection"]
     average_considered_betrayal = config["average_considered_betrayal"]
-    forgiveness_mode = 'WIPE'#config["forgiveness_mode"]
+    print('here')
+    forgiveness_mode = config["forgiveness_mode"]
+    print(forgiveness_mode)
     assignment = config['agent_assignment']
     positions = config['node_positions']
     #graph = create_networkx_graph(num_nodes=num_nodes, num_edges=num_edges)

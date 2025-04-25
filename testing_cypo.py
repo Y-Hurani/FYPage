@@ -2,6 +2,7 @@ import dash
 from dash import dcc, html
 import dash_cytoscape as cyto
 import networkx as nx
+import os, sys
 
 # Global state variables
 CURRENT_COLORS = []
@@ -167,15 +168,23 @@ def attach_simulation_mode(app, graph, colors, dimensions, positions):
         app.latest_data['moods'] = new_moods
 
     app.update_data = update_data
+    print('about to pass')
     app.layout = html.Div([
         html.H1("Network Visualization"),
+        html.Div([
+            html.Button("Terminate Simulation", id="restart-button", 
+                       style={"backgroundColor": "#4CAF50", "color": "white", 
+                              "padding": "10px 15px", "border": "none", 
+                              "borderRadius": "4px", "cursor": "pointer"}),
+            html.Div(id="restart-status")
+        ]),
         html.Div(id="update-div"),
         dcc.Store(id='mood-store', data={}),
         dcc.Store(id='color-store', data={}),
         dcc.Interval(id="update-interval", interval=500, n_intervals=0),
         cytoscape_with_layout(graph, colors, dimensions, positions)
     ])
-
+    print('passed')
     # Rebind Callbacks
     @app.callback(
         [dash.Output('color-store', 'data'),
@@ -196,6 +205,19 @@ def attach_simulation_mode(app, graph, colors, dimensions, positions):
 
     def update_graph(colors, moods, zoom, pan):
         return nx_to_cytoscape(graph, colors, dimensions, moods = moods, positions = positions), zoom, pan
+    
+    @app.callback(
+        dash.Output('restart-status', 'children'),
+        dash.Input('restart-button', 'n_clicks'),
+        prevent_initial_call=True
+    )
+    def restart_server(n_clicks):
+        if n_clicks:
+            # This will restart the current Python process
+            print("Terminating server...")
+            os.execl(sys.executable, sys.executable, *sys.argv)
+            # Note: The code after this line won't execute due to the restart
+        return ""
 # Example usage
 if __name__ == "__main__1":
     # Create a sample graph

@@ -87,13 +87,27 @@ def create_gui_app(server):
         ]),
         dbc.Row([
             dbc.Label("Max Connection Distance (Higher than 100,000 is no limit)", className="mt-3", style={"margin-right": "15px"}),
-            dcc.Input(id='max-dist', type='number', value=250, step=1),
+            dcc.Input(id='max-dist', type='number', value=350, step=1),
         ]),
         dbc.Row([
             dbc.Label("% Reconnection (R%)", className="mt-3", style={"margin-right": "15px"}),
             dcc.Slider(id='reconnect-pct', min=0, max=1, step=0.01, value=0.2,
                     marks={0: '0%', 0.5: '50%', 1: '100%'}, tooltip={"placement": "bottom", "always_visible": True})
         ]),
+        dbc.Row([
+            dbc.Label("Edge Creation Method", className="mt-3", style={"margin-right": "15px"}),
+            dbc.RadioItems(
+                options=[
+                    {"label": "WIPE (Wipe and Initialize Positions and Edges)", "value": "WIPE"},
+                    {"label": "POP (Preserve Original Positions)", "value": "POP"}
+                ],
+                value="WIPE",  # Default value
+                id="forgiveness-mode",
+                inline=True,
+                className="mt-2"
+            )
+        ]),
+
 
         html.Hr(),
         html.H4("Agent Type Weights"),
@@ -107,13 +121,30 @@ def create_gui_app(server):
             ]) for agent in agent_weights
         ],
 
-        html.Div(id='sarsa-config', children=[], style={'display': 'none', 'marginTop': '20px'}),
-        html.Div(id='moody-config', children=[], style={'display': 'none', 'marginTop': '20px'}),
+        html.Div([
+            html.H5("SARSA Parameters"),
+            dbc.Label("Epsilon", style={"margin-right": "15px"}), 
+            dcc.Input(id='sarsa-epsilon', type='number', value=0.1, step=0.01, style={"margin-right": "15px"}),
+            dbc.Label("Alpha", style={"margin-right": "15px"}), 
+            dcc.Input(id='sarsa-alpha', type='number', value=0.1, step=0.01, style={"margin-right": "15px"}),
+            dbc.Label("Gamma", style={"margin-right": "15px"}), 
+            dcc.Input(id='sarsa-gamma', type='number', value=0.95, step=0.01)
+        ], id='sarsa-config', style={'display': 'none', 'marginTop': '20px'}),
+
+        html.Div([
+            html.H5("Moody SARSA Parameters"),
+            dbc.Label("Epsilon", style={"margin-right": "15px"}), 
+            dcc.Input(id='moody-epsilon', type='number', value=0.1, step=0.01, style={"margin-right": "15px"}),
+            dbc.Label("Alpha", style={"margin-right": "15px"}), 
+            dcc.Input(id='moody-alpha', type='number', value=0.1, step=0.01, style={"margin-right": "15px"}),
+            dbc.Label("Gamma", style={"margin-right": "15px"}), 
+            dcc.Input(id='moody-gamma', type='number', value=0.95, step=0.01)
+        ], id='moody-config', style={'display': 'none', 'marginTop': '20px'}),
 
         html.Hr(),
         dbc.Button("Overview", id='overview-btn', color='primary', className='mt-4'),
-        dbc.Button("Start Simulation", id='run-sim-btn', color='success', className='mt-4 ms-2'),
-        dbc.Button("Print Node Positions", id="print-positions-btn", className="mb-3"),
+        dbc.Button("Start Simulation", id='run-sim-btn', color='success', className='mt-4 ms-2', 
+           style={"display": "none"}),  # Hidden by default
         html.Div(id='output', className='mt-3'),
         # Add a new element to display simulation status
         html.Div(id='simulation-status', className='mt-3'),
@@ -139,7 +170,7 @@ def create_gui_app(server):
         return ({'display': 'block'} if sarsa_weight > 0 else {'display': 'none'},
                 {'display': 'block'} if moody_weight > 0 else {'display': 'none'})
 
-    @app.callback(
+    """ @app.callback(
         Output('sarsa-config', 'children'),
         Input('weight-SARSAAgent', 'value')
     )
@@ -165,7 +196,7 @@ def create_gui_app(server):
                 dbc.Label("Alpha", style={"margin-right": "15px"}), dcc.Input(id='moody-alpha', type='number', value=0.1, step=0.01, style={"margin-right": "15px"}),
                 dbc.Label("Gamma", style={"margin-right": "15px"}), dcc.Input(id='moody-gamma', type='number', value=0.95, step=0.01, style={"margin-right": "15px"})
             ]
-        return []
+        return [] """
 
     @app.callback(
         Output('cytoscape-container', 'children'),
@@ -240,6 +271,18 @@ def create_gui_app(server):
             ],
             userZoomingEnabled=False
         )
+    
+    # Show the Simulation Button (Activated by Overview button)
+    @app.callback(
+        Output('run-sim-btn', 'style'),
+        Input('cytoscape-container', 'children')
+    )
+    def show_sim_button(graph_content):
+        # If the graph has been generated (cytoscape container has children), 
+        # show the start simulation button
+        if graph_content:
+            return {"display": "inline-block"}
+        return {"display": "none"}
 
     @app.callback(
     Output('overview-graph', 'elements'), 
@@ -289,18 +332,6 @@ def create_gui_app(server):
         return f"Positions updated: {len(node_positions)}"
 
     @app.callback(
-        Output('print-positions-btn', 'n_clicks'),
-        Input('print-positions-btn', 'n_clicks')
-    )
-    def print_positions(n):
-        if n:
-            print("Current Node Positions:")
-            for node_id, pos in node_positions.items():
-                print(f"Node {node_id}: x = {pos['x']}, y = {pos['y']}")
-        return None
-
-
-    @app.callback(
         Input('run-sim-btn', 'n_clicks'),
         State('overview-graph', 'elements'),
         State('num-nodes', 'value'),
@@ -309,6 +340,7 @@ def create_gui_app(server):
         State('betrayal-threshold', 'value'),
         State('reconnect-pct', 'value'),
         State('max-dist', 'value'),
+        State('forgiveness-mode', 'value'),
         State('sarsa-epsilon', 'value'),
         State('sarsa-alpha', 'value'),
         State('sarsa-gamma', 'value'),
@@ -317,7 +349,7 @@ def create_gui_app(server):
         State('moody-gamma', 'value')
     )
     def launch_simulation(n_clicks, elements, num_nodes, num_edges, num_games, betrayal_thresh, reconnect_pct,
-                        max_dist, sarsa_eps, sarsa_alpha, sarsa_gamma,
+                        max_dist, forgiveness_mode, sarsa_eps, sarsa_alpha, sarsa_gamma,
                         moody_eps, moody_alpha, moody_gamma):
         if not n_clicks:
             return dash.no_update
@@ -354,10 +386,12 @@ def create_gui_app(server):
             "num_games_per_pair": num_games,
             "percent_reconnection": reconnect_pct,
             "max_connection_distance": max_dist,
+            "forgiveness_mode": forgiveness_mode,
             "average_considered_betrayal": betrayal_thresh,
             "SARSAAgent_params": {"epsilon": sarsa_eps, "alpha": sarsa_alpha, "gamma": sarsa_gamma},
             "MoodySARSAAgent_params": {"epsilon": moody_eps, "alpha": moody_alpha, "gamma": moody_gamma}
         }
+        
 
         with open("params.json", "w") as f:
             json.dump(config, f, indent=4)
@@ -368,18 +402,26 @@ def create_gui_app(server):
 
         # p = subprocess.run([sys.executable, "test3.py", 
         #                 "--config", "params.json"])
+        print('yippe')
         global app
         graph = create_networkx_graph(num_nodes=num_nodes, num_edges=num_edges)
+        print('yippe2')
         #visualize(graph, dimensions)
         graph = add_edges_to_graph(graph, num_edges, num_nodes, node_positions, float(max_dist))
+        print('yippe3')
         
         colors = []
         dimensions = 10
+        print('yippe3.5')
         attach_simulation_mode(app, graph, colors, dimensions, node_positions)
+        print('yippe4')
         app.config.suppress_callback_exceptions = True
-        import threading
-        
-        threading.Thread(target=main, args=(app, graph, config), daemon=True).start()
+        import threading, traceback
+        try:
+            threading.Thread(target=main, args=(app, graph, config), daemon=True).start()
+        except Exception as e:
+            print("Exception in thread:")
+            traceback.print_exc()  # Logs the full stack trace to the console
         return dcc.Location(href="/", id="dummy")
     
 
