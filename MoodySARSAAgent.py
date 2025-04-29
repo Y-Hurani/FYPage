@@ -8,33 +8,22 @@ from collections import deque
 
 class MoodySARSAAgent(Agent):
     def __init__(self, n_states, n_actions, n_agents, id, alpha=0.1, gamma=0.95, epsilon=0.1):
-        self.id = id
-        self.n_states = n_states
-        self.n_actions = n_actions
+        super().__init__(id, n_states, n_actions, n_agents)
         self.alpha = alpha  # Learning rate
         self.gamma = gamma  # Discount factor gamma
         self.epsilon = epsilon  # Exploration
         self.betrayal_memory = deque()
         self.mood = 50 # random.uniform(1, 99)  # Mood value (1 to 100, neutral mood = 50)
         self.prev_omegas = {i: 0 for i in range(n_agents)}
-        self.total_games = 0  # Number of games played so far
-        self.average_payoff = 0  # Running average of payoffs
 
         # Q-tables for each opponent agent
         # dictionary with key = agent id and the value is the q table
         self.q_tables = {i: np.zeros((n_states, n_actions))
                          for i in range(n_agents)}
 
-        # Memory dictionary: key = opponent_id, value = list of last 20 moves/rewards
-        self.memories = {i: []
-                         for i in range(n_agents)}
 
     def set_epsilon(self, epsilon):
         self.epsilon = epsilon
-
-    def update_average_payoff(self, payoff):
-        self.total_games += 1
-        self.average_payoff += (payoff - self.average_payoff) / self.total_games
 
     def after_game_function(self, state, action, next_state, next_action, reward, opponent_reward, opponent_id):
         self.update_q_value(state, action, reward, opponent_id)

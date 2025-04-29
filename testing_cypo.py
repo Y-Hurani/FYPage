@@ -61,9 +61,10 @@ def grid_layout_positions(graph, dimensions):
 
 
 def cytoscape_with_layout(graph, colors, dimensions, positions):
-    """Create a Dash Cytoscape component with a 7x7 grid layout."""
+    """Create a Dash Cytoscape component with a grid layout."""
     elements = nx_to_cytoscape(graph, colors, dimensions, positions)
-    # positions = grid_layout_positions(graph, dimensions)
+    if not positions:
+        positions = grid_layout_positions(graph, dimensions)
 
     layout = [
         {"data": {"id": str(node), "label": str(node)},
@@ -128,7 +129,7 @@ def create_dash_app(graph, colors, dimensions):
             interval=500,  # Changed to 500ms for better performance
             n_intervals=0
         ),
-        cytoscape_with_layout(graph, colors, dimensions)
+        cytoscape_with_layout(graph, colors, dimensions, None)
     ])
 
     # CALLBACK 1: Sync data from app.latest_data to the stores

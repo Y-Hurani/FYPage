@@ -7,8 +7,9 @@ class Agent:
         self.n_actions = n_actions
         self.n_agents = n_agents
         self.average_payoff = 0
-        self.total_games = 0
+        self.total_games = 1
         self.memories = {opponent_id: [] for opponent_id in range(n_agents)}  # Track memories for each opponent
+        self.total_cooperation = 0
         self.betrayal_memory = set()
         self.mood = 50
 
@@ -23,6 +24,8 @@ class Agent:
     def update_average_payoff(self, payoff):
         self.total_games += 1
         self.average_payoff += (payoff - self.average_payoff) / self.total_games
+        if payoff == 3 or payoff == 0:
+            self.total_cooperation += 1
         
     def choose_action(self, state, opponent_id, **kwargs):
         """

@@ -164,23 +164,6 @@ def add_edges_to_graph(graph, num_edges, num_nodes, positions, max_connection_di
             graph.add_edge(node_a, node_b)   
     return graph
 
-def visualize(graph, grid_size=7):
-    # Define fixed positions for the nodes in a grid
-    for node in graph.nodes:
-        row = node // grid_size
-        col = node % grid_size
-        x = col * 100
-        y = row * 100
-        node_positions[node] = (x, y)
-
-    for node, (x, y) in node_positions.items():
-        net.add_node(node, x=x, y=y, fixed=True)
-
-    for edge in graph.edges:
-        net.add_edge(*edge)
-
-    return net
-
 def generate_agents(n_agents, weights, n_states, n_actions, assignment = False):
     """
     Generate a list of agents based on weighted probabilities.

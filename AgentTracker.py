@@ -121,50 +121,62 @@ class AgentTracker:
             avg_score_moody = round(np.mean([agent.average_payoff for agent in moody_agents]), 3)
             avg_connectivity_moody = round(np.mean([self._calculate_normalized_degree(agent.id, current_degrees) 
                                               for agent in moody_agents]), 3)
+            avg_cooperation_moody = round(np.mean([agent.total_cooperation/agent.total_games for agent in moody_agents]), 3)
         else:
             avg_mood_moody = 0
             avg_score_moody = 0
             avg_connectivity_moody = 0
+            avg_cooperation_moody = 0
         
     
-        # Calculate metrics for saras agents
-        if  sarsa_agents:
-            avg_score_sarsa = round(np.mean([agent.average_payoff for agent in     sarsa_agents]), 3)
+        # Calculate metrics for sarsa agents
+        if sarsa_agents:
+            avg_score_sarsa = round(np.mean([agent.average_payoff for agent in sarsa_agents]), 3)
             avg_connectivity_sarsa = round(np.mean([self._calculate_normalized_degree(agent.id, current_degrees) 
-                                                  for agent in     sarsa_agents]), 3)
+                                                  for agent in sarsa_agents]), 3)
+            avg_cooperation_sarsa = round(np.mean([agent.total_cooperation/agent.total_games for agent in sarsa_agents]), 3)
         else:
             avg_score_sarsa = 0
             avg_connectivity_sarsa = 0
+            avg_cooperation_sarsa = 0
     
         # Calculate metrics for TFT agents
         if tft_agents:
             avg_score_tft = round(np.mean([agent.average_payoff for agent in tft_agents]), 3)
             avg_connectivity_tft = round(np.mean([self._calculate_normalized_degree(agent.id, current_degrees) 
                                                 for agent in tft_agents]), 3)
+            avg_cooperation_tft = round(np.mean([agent.total_cooperation/agent.total_games for agent in tft_agents]), 3)
         else:
             avg_score_tft = 0
             avg_connectivity_tft = 0
+            avg_cooperation_tft = 0
 
         # Calculate metrics for WSLS agents
         if wsls_agents:
             avg_score_wsls = round(np.mean([agent.average_payoff for agent in wsls_agents]), 3)
             avg_connectivity_wsls = round(np.mean([self._calculate_normalized_degree(agent.id, current_degrees) 
                                                 for agent in wsls_agents]), 3)
+            avg_cooperation_wsls = round(np.mean([agent.total_cooperation/agent.total_games for agent in wsls_agents]), 3)
         else:
             avg_score_wsls = 0
             avg_connectivity_wsls = 0
+            avg_cooperation_wsls = 0
 
         # Store the data in the tracking dictionary
         self.tracking_data[self.current_round]['agent_types'] = {
             'moody_avg_mood': avg_mood_moody,
             'moody_avg_score': avg_score_moody,
             'moody_avg_connectivity': avg_connectivity_moody,
+            'moody_avg_cooperation': avg_cooperation_moody,
             'sarsa_avg_score': avg_score_sarsa,
             'sarsa_avg_connectivity': avg_connectivity_sarsa,
+            'sarsa_avg_cooperation': avg_cooperation_sarsa,
             'tft_avg_score': avg_score_tft,
             'tft_avg_connectivity': avg_connectivity_tft,
+            'tft_avg_cooperation': avg_cooperation_tft,
             'wsls_avg_score': avg_score_wsls,
-            'wsls_avg_connectivity': avg_connectivity_wsls
+            'wsls_avg_connectivity': avg_connectivity_wsls,
+            'wsls_avg_cooperation': avg_cooperation_wsls
         }
 
         # Create a dictionary for CSV output
@@ -173,12 +185,16 @@ class AgentTracker:
             'moody_avg_mood': avg_mood_moody,
             'moody_avg_score': avg_score_moody,
             'moody_avg_connectivity': avg_connectivity_moody,
+            'moody_avg_cooperation': avg_cooperation_moody,
             'sarsa_avg_score': avg_score_sarsa,
             'sarsa_avg_connectivity': avg_connectivity_sarsa,
+            'sarsa_avg_cooperation': avg_cooperation_sarsa,
             'tft_avg_score': avg_score_tft,
             'tft_avg_connectivity': avg_connectivity_tft,
+            'tft_avg_cooperation': avg_cooperation_tft,
             'wsls_avg_score': avg_score_wsls,
-            'wsls_avg_connectivity': avg_connectivity_wsls
+            'wsls_avg_connectivity': avg_connectivity_wsls,
+            'wsls_avg_cooperation': avg_cooperation_wsls
         }
 
         self._write_to_csv(agent_type_data, mode='types')  

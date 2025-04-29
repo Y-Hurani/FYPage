@@ -9,7 +9,7 @@ import json
 from testing_cypo import create_dash_app
 from flask import Flask
 import sys, os, time
-from test3 import main, create_networkx_graph, add_edges_to_graph, visualize
+from test3 import main, create_networkx_graph, add_edges_to_graph
 from testing_cypo import attach_simulation_mode
 
 # Import the shared server

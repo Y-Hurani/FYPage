@@ -24,14 +24,7 @@ class PrisonersDilemmaEnvironment:
         self.n_states = n_states  # Trust levels range from 0 to 9
         self.total = [0, 0]  # Tracks total cooperation/defection counts
 
-        # Initialize trust levels: dictionary of dictionaries
-        self.trust_levels = {agent: {other: 0 for other in range(n_agents) if other != agent}
-                             for agent in range(n_agents)}
-
     def reset(self):
-        """Reset all trust levels to neutral."""
-        self.trust_levels = {agent: {other: 0 for other in range(self.n_agents) if other != agent}
-                             for agent in range(self.n_agents)}
         self.total = [0, 0]
 
     def step(self, id_A, id_B, action_A, action_B):
@@ -307,12 +300,12 @@ n_states = 101
 n_actions = 2  # Actions: 0 = defect, 1 = coop
 fixed = 0
 weights = {
-    "SARSAAgent": 0.25,
-    "MoodySARSAAgent": 0.25,
+    "SARSAAgent": 0.00,
+    "MoodySARSAAgent": 1.00,
     "CooperativeAgent": 0.00,  
     "DefectingAgent": 0.00,  
-    "TFTAgent": 0.25,
-    "WSLSAgent": 0.25
+    "TFTAgent": 0.0,
+    "WSLSAgent": 0.0
 }
 
 agents = generate_agents(n_agents, weights, n_states, n_actions)
@@ -354,66 +347,68 @@ subset_size = int(len(possible_pairs) * percent_reconnection)
 tracker = AgentTracker(agents, dimensions, 100, max_degrees)
 
 
-# game loop to update the Dash graph
-for percentage_spread in [250]:
-    #sarsa_spread = percentage_spread * 0.10
-    #weights['SARSAAgent'] = sarsa_spread
-    #weights['MoodySARSAAgent'] = 1 - sarsa_spread
-    max_connection_distance = percentage_spread
-    agents = generate_agents(n_agents, weights, n_states, n_actions)
-    tracker = AgentTracker(agents, dimensions, 100, max_degrees)
-    tracker.csv_path_mood = f"stats/agent_mood_by_layer_{percentage_spread}.csv"
-    tracker.csv_path_score = f"stats/agent_mood_by_layer_{percentage_spread}.csv"
-    for i in range(num_games_per_pair):
-        for edge in graph.edges():
-            play_game(agents[edge[0]], agents[edge[1]], env, edge[0], edge[1], fixed)
-        if fixed >= 1:
-            fixed = fixed - 1
+    # game loop to update the Dash graph
+for limit in [250]:#, 250000]:
+    for percentage_spread in range(0, 1):
+        sarsa_spread = percentage_spread * 0.10
+        weights['SARSAAgent'] = sarsa_spread
+        weights['MoodySARSAAgent'] = 1 - sarsa_spread
+        max_connection_distance = limit
+        agents = generate_agents(n_agents, weights, n_states, n_actions)
+        tracker = AgentTracker(agents, dimensions, 100, max_degrees)
+        tracker.csv_path_mood = f"stats/agent_mood_by_layer_{percentage_spread}_{limit}.csv"
+        tracker.csv_path_score = f"stats/agent_mood_by_layer_{percentage_spread}.{limit}csv"
+        for i in range(num_games_per_pair):
+            for edge in graph.edges():
+                play_game(agents[edge[0]], agents[edge[1]], env, edge[0], edge[1], fixed)
+            if fixed >= 1:
+                fixed = fixed - 1
 
-        if (i + 1) % (reconstruction_interval * 10) == 1:
-            current_degrees = {node: graph.degree(node) for node in graph.nodes()}
-            tracker.track_types_metrics(current_degrees)
-            
-        if (i + 1) % (reconstruction_interval * 100) == 1:
-            print(env.total)
-            env.reset()
-            trigger_forgiveness('WIPE')
-            
-        if (i + 1) % reconstruction_interval == 0:
-            print(f"Reconstruction event at iteration {i + 1}")
+            if (i + 1) % (reconstruction_interval * 10) == 1:
+                current_degrees = {node: graph.degree(node) for node in graph.nodes()}
+                tracker.track_types_metrics(current_degrees)
+                trigger_forgiveness('POP')
+                
+            if (i + 1) % (reconstruction_interval * 100) == 1:
+                print(env.total)
+                env.reset()
+                
+                
+            if (i + 1) % reconstruction_interval == 0:
+                print(f"Reconstruction event at iteration {i + 1}")
 
-            evaluated_pairs = random.sample(possible_pairs, subset_size)
+                evaluated_pairs = random.sample(possible_pairs, subset_size)
 
-            for agent_a, agent_b in evaluated_pairs:
-                distance = calculate_distance(agent_b, agent_a)
-                if distance > max_connection_distance:
-                    continue
-                if graph.has_edge(agent_a, agent_b):
-                    decision_a = agents[agent_a].keep_connected_to_opponent(agent_b, average_considered_betrayal, i)
-                    decision_b = agents[agent_b].keep_connected_to_opponent(agent_a, average_considered_betrayal, i)
-                    if decision_a == 0:# or decision_b == 0:
-                        graph.remove_edge(agent_a, agent_b)
-                else:
-                    # If either of the agents are moody and hold grudge against opponent, dont connect
-                    condition_A, condition_B = True, True
-                    if isinstance(agents[agent_a], MoodySARSAAgent) or isinstance(agents[agent_a], SARSAAgent):
-                        if agent_b in agents[agent_a].betrayal_memory:
-                            condition_A = False
+                for agent_a, agent_b in evaluated_pairs:
+                    distance = calculate_distance(agent_b, agent_a)
+                    if distance > max_connection_distance:
+                        continue
+                    if graph.has_edge(agent_a, agent_b):
+                        decision_a = agents[agent_a].keep_connected_to_opponent(agent_b, average_considered_betrayal, i)
+                        decision_b = agents[agent_b].keep_connected_to_opponent(agent_a, average_considered_betrayal, i)
+                        if decision_a == 0:# or decision_b == 0:
+                            graph.remove_edge(agent_a, agent_b)
+                    else:
+                        # If either of the agents are moody and hold grudge against opponent, dont connect
+                        condition_A, condition_B = True, True
+                        if isinstance(agents[agent_a], MoodySARSAAgent) or isinstance(agents[agent_a], SARSAAgent):
+                            if agent_b in agents[agent_a].betrayal_memory:
+                                condition_A = False
 
-                    if isinstance(agents[agent_b], MoodySARSAAgent) or isinstance(agents[agent_b], SARSAAgent):
-                        if agent_a in agents[agent_b].betrayal_memory:
-                            condition_B = False
+                        if isinstance(agents[agent_b], MoodySARSAAgent) or isinstance(agents[agent_b], SARSAAgent):
+                            if agent_a in agents[agent_b].betrayal_memory:
+                                condition_B = False
 
-                    if condition_A and condition_B:
-                        graph.add_edge(agent_a, agent_b)
+                        if condition_A and condition_B:
+                            graph.add_edge(agent_a, agent_b)
 
-            # Trigger Dash Cytoscape to redraw the updated graph
-            # This replaces `network_visualization.show("network.html")`
-            colors, moods = update_colors_moods()
-            elements = nx_to_cytoscape(graph, colors, dimensions, moods)
-            app.layout.children[-1].elements = elements
-            app.update_data(colors, moods)
-            #for agent in agents:
-            #    if isinstance(agent, MoodySARSAAgent):
-            #        agent.set_epsilon(agent.epsilon * 0.9995)
-            time.sleep(0.05)
+                # Trigger Dash Cytoscape to redraw the updated graph
+                # This replaces `network_visualization.show("network.html")`
+                colors, moods = update_colors_moods()
+                elements = nx_to_cytoscape(graph, colors, dimensions, moods)
+                app.layout.children[-1].elements = elements
+                app.update_data(colors, moods)
+                #for agent in agents:
+                #    if isinstance(agent, MoodySARSAAgent):
+                #        agent.set_epsilon(agent.epsilon * 0.9995)
+                time.sleep(0.05)
