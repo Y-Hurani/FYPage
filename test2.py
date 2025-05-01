@@ -357,7 +357,7 @@ for limit in [250]:#, 250000]:
         agents = generate_agents(n_agents, weights, n_states, n_actions)
         tracker = AgentTracker(agents, dimensions, 100, max_degrees)
         tracker.csv_path_mood = f"stats/agent_mood_by_layer_{percentage_spread}_{limit}.csv"
-        tracker.csv_path_score = f"stats/agent_mood_by_layer_{percentage_spread}.{limit}csv"
+        tracker.csv_path_score = f"stats/agent_mood_by_layer_{percentage_spread}_{limit}csv"
         for i in range(num_games_per_pair):
             for edge in graph.edges():
                 play_game(agents[edge[0]], agents[edge[1]], env, edge[0], edge[1], fixed)
