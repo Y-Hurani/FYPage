@@ -1,3 +1,7 @@
+'''
+THIS FILE IS USED TO RUN MULTIPLE SIMULATIONS AT THE SAME TIME. THIS CAN BE USED BY THE USER, HOWEVER
+I KEPT IT TO BE USED BY ME TO HARVEST DATA IN BULK AND OVER THE SPAN OF MULTIPLE DAYS AT THE SAME TIME
+'''
 import time
 from collections import deque
 import numpy as np
@@ -13,7 +17,7 @@ from DefectingAgent import DefectingAgent
 from SARSAAgent import SARSAAgent
 from AgentTracker import AgentTracker
 from MoodySARSAAgent import MoodySARSAAgent
-from testing_cypo import create_dash_app  # Replace with your actual filename
+from testing_cypo import create_dash_app 
 from testing_cypo import nx_to_cytoscape
 import threading
 
@@ -21,7 +25,7 @@ import threading
 class PrisonersDilemmaEnvironment:
     def __init__(self, n_agents, n_states=10):
         self.n_agents = n_agents  # Total number of agents
-        self.n_states = n_states  # Trust levels range from 0 to 9
+        self.n_states = n_states 
         self.total = [0, 0]  # Tracks total cooperation/defection counts
 
     def reset(self):
@@ -47,18 +51,11 @@ class PrisonersDilemmaEnvironment:
             reward_A, reward_B = 1, 1
             self.total[0] += 2
 
-        # Update trust levels based on outcomes
-        #self.update_trust(id_A, id_B, action_A, action_B)
-
-        #new_state_a = self.trust_levels[id_A][id_B]
-        #new_state_b = self.trust_levels[id_B][id_A]
-
         return (reward_A, reward_B)
 
     def update_trust(self, agent_A, agent_B, action_A, action_B):
         """
-        Adjust trust levels based on actions.
-        Trust increases with cooperation and decreases with defection.
+        Depreciated.
         """
         if action_A == 1:  # Agent A cooperated
             self.trust_levels[agent_B][agent_A] = min(self.n_states - 1, self.trust_levels[agent_B][agent_A] + 1)
@@ -74,7 +71,6 @@ def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     """
     Plays one game of IPD between two agents, retrieving states from the environment.
     """
-
 
     state_A = agent_A.mood if isinstance(agent_A, MoodySARSAAgent) else 50
     state_B = agent_B.mood if isinstance(agent_B, MoodySARSAAgent) else 50
@@ -101,10 +97,6 @@ def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     agent_A.after_game_function(state_A, action_A, next_state_A, next_action_A, reward_A, reward_B, id_B)
     agent_B.after_game_function(state_B, action_B, next_state_B, next_action_B, reward_B, reward_A, id_A)
 
-
-    # Update the trust states in the environment
-    # env.trust_levels[id_A][id_B] = next_state_A
-    # env.trust_levels[id_B][id_A] = next_state_B
 
 node_positions = {} # Coordinates of each node
 def calculate_distance(node_a, node_b, positions=node_positions):
@@ -195,11 +187,11 @@ def generate_agents(n_agents, weights, n_states, n_actions):
     total_weight = sum(weights.values())
     normalized_weights = {key: val / total_weight for key, val in weights.items()}
 
-    # Prepare a list of agent types and probabilities
+    # list of agent types and probabilities
     agent_types = list(agent_classes.keys())
     probabilities = [normalized_weights[agent_type] for agent_type in agent_types]
 
-    # Generate agents based on the weighted random selection
+    # Generate agents based on weight
     agents = []
     for agent_id in range(n_agents):
         chosen_type = random.choices(agent_types, probabilities, k=1)[0]
@@ -312,18 +304,8 @@ agents = generate_agents(n_agents, weights, n_states, n_actions)
 colors, moods = update_colors_moods()
 visualize(graph, dimensions)
 add_edges_to_graph(graph)
-#agents = [MoodySARSAAgent(n_states=n_states, n_actions=n_actions, n_agents=n_agents, id=_) for _ in range(n_agents)]
-#agents[24] = CooperativeAgent(id=24, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
-#agents[1] = TFTAgent(id=1, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
-#agents[5] = DefectingAgent(id=5, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
 env = PrisonersDilemmaEnvironment(n_agents=n_agents, n_states=n_states)
 
-'''
-for x in range(10):
-    agents[x] = CooperativeAgent(id=x, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
-    y = x + 110
-    agents[y] = DefectingAgent(id=y, n_states=n_states, n_actions=n_actions, n_agents=n_agents)
-'''
 
 # pair matches
 num_games_per_pair = 50000
@@ -408,7 +390,7 @@ for limit in [250]:#, 250000]:
                 elements = nx_to_cytoscape(graph, colors, dimensions, moods)
                 app.layout.children[-1].elements = elements
                 app.update_data(colors, moods)
-                #for agent in agents:
+                #for agent in agents: # Epsilon decay (Experimental)
                 #    if isinstance(agent, MoodySARSAAgent):
                 #        agent.set_epsilon(agent.epsilon * 0.9995)
                 time.sleep(0.05)

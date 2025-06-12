@@ -2,18 +2,18 @@ import math
 import random
 import numpy as np
 from Agent import Agent
-from DefectingAgent import DefectingAgent
+from DefectingAgent import DefectingAgent # in case to implement impossibility to disconnect from control agents
 from collections import deque
 
 
 class MoodySARSAAgent(Agent):
     def __init__(self, n_states, n_actions, n_agents, id, alpha=0.1, gamma=0.95, epsilon=0.1):
         super().__init__(id, n_states, n_actions, n_agents)
-        self.alpha = alpha  # Learning rate
-        self.gamma = gamma  # Discount factor gamma
-        self.epsilon = epsilon  # Exploration
+        self.alpha = alpha  # learning rate
+        self.gamma = gamma
+        self.epsilon = epsilon  # exploration
         self.betrayal_memory = deque()
-        self.mood = 50 # random.uniform(1, 99)  # Mood value (1 to 100, neutral mood = 50)
+        self.mood = 50 # Mood value (1 to 100, neutral mood = 50)
         self.prev_omegas = {i: 0 for i in range(n_agents)}
 
         # Q-tables for each opponent agent
@@ -32,8 +32,6 @@ class MoodySARSAAgent(Agent):
         self.update_average_payoff(reward)
     
     def calculate_new_omega(self, opponent_id, reward, opponent_reward):
-        # avg_self_reward = self.average_reward(opponent_id)
-
         # Calculate average rewards including the new payoff
         self_payoffs = self.memories[opponent_id]
         opponent_payoffs = []
@@ -54,13 +52,7 @@ class MoodySARSAAgent(Agent):
 
         avg_self_reward_t = np.mean(self_payoffs[-19:] + [reward]) if self_payoffs else reward
 
-        #opponent_payoffs = agents[opponent_id].memories[self.id]
         avg_opponent_reward_t = np.mean(opponent_payoffs[-19:] + [opponent_reward]) if opponent_payoffs else opponent_reward
-
-        """avg_self_reward = self.average_payoff
-        avg_self_reward_t = avg_self_reward + ((reward - avg_self_reward) / (self.total_games + 1))
-
-        avg_opponent_reward_t = opponent_average"""
 
         # Calculate alpha and omega (Homo Egualis adjustment)
         alpha = (100 - self.mood) / 100
@@ -70,7 +62,7 @@ class MoodySARSAAgent(Agent):
 
     def update_mood(self, opponent_id, reward, opponent_reward):
         """
-        Adjust mood based on self-performance and fairness using opponent's payoff history.
+        Adjust mood based on performance and fairness using opponent payoff history
         """
         omega = self.calculate_new_omega(opponent_id, reward, opponent_reward)
         self.mood += int(reward - self.prev_omegas[opponent_id])
@@ -79,7 +71,7 @@ class MoodySARSAAgent(Agent):
 
     def compute_mood_adjusted_estimate(self, opponent_id):
         """
-        Calculate Ψ, a mood-adjusted estimate for future rewards.
+        Calculate mood-adjusted estimate
         """
         memory = self.memories[opponent_id]
         if not memory:
@@ -90,7 +82,6 @@ class MoodySARSAAgent(Agent):
         depth = math.ceil(mood_factor * max_depth)  # Scales depth based on mood
         relevant_memory = memory[-depth:] if depth > 0 else memory
 
-        #print(f"Memory Slice (Depth n): {depth}, Mood: {self.mood}")
         return np.mean(relevant_memory) if relevant_memory else 0
 
     def choose_action(self, state, opponent_id, fixed=0):
@@ -111,22 +102,20 @@ class MoodySARSAAgent(Agent):
             decision_epsilon = 0.9
 
         if random.uniform(0, 1) < decision_epsilon:  # Random chance based on epsilon to choose randomly instead
-            #chosen_action = random.choice(range(self.n_actions))  # Explore random choice
             if self.mood > 90:
                 chosen_action = random.choices(population=range(self.n_actions), weights=[0.5, 0.5])[0]
             else:
                 chosen_action = random.choices(population=range(self.n_actions), weights=[0.5, 0.5])[0]
-            #print(chosen_action, chosen_action2)
         return chosen_action
 
     def update_q_value(self, state, action, reward, opponent_id):
         """
-        Modify SARSA's Q-value update rule to incorporate mood-adjusted.
+        Modify SARSA Q-value update rule to mood-adjusted
         """
         q_table = self.q_tables[opponent_id]
         mood_adjusted_estimate = self.compute_mood_adjusted_estimate(opponent_id)
 
-        # Standard SARSA update with mood-adjusted Ψ
+        # Standard SARSA update with mood adjusted
         td_target = reward + self.gamma * mood_adjusted_estimate
         td_error = td_target - q_table[state, action]
         q_table[state, action] += self.alpha * td_error
@@ -155,5 +144,3 @@ class MoodySARSAAgent(Agent):
             return 0
         else:
             return 1
-
-bingy = deque()

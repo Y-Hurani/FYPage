@@ -1,4 +1,3 @@
-# server.py
 from flask import Flask
 
 # Create the Flask server to be shared

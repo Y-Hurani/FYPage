@@ -37,7 +37,7 @@ def nx_to_cytoscape(graph, colors, dimensions, moods = None, positions = None):
                 'mood': mood
             },
             'position': position,
-            'classes': color  # Add this for CSS styling if needed
+            'classes': color
         })
 
     for edge in graph.edges():
@@ -105,7 +105,6 @@ def cytoscape_with_layout(graph, colors, dimensions, positions):
 def create_dash_app(graph, colors, dimensions):
     app = dash.Dash(__name__)
 
-    # Initialize data cache for external updates
     app.latest_data = {
         'colors': colors.copy() if colors else [],
         'moods': {}
@@ -126,7 +125,7 @@ def create_dash_app(graph, colors, dimensions):
         dcc.Store(id='color-store', data={}),
         dcc.Interval(
             id="update-interval",
-            interval=500,  # Changed to 500ms for better performance
+            interval=500,  # Changed to 500ms (twice per second instead of 10) for better performance
             n_intervals=0
         ),
         cytoscape_with_layout(graph, colors, dimensions, None)
@@ -141,7 +140,7 @@ def create_dash_app(graph, colors, dimensions):
     def sync_data_to_stores(n_intervals):
         return app.latest_data['colors'], app.latest_data['moods']
 
-    # CALLBACK 2: Update graph when store data changes
+    # CALLBACK 2: update graph when store data changes
     @app.callback(
         [dash.Output('cytoscape-graph', 'elements'),
         dash.Output('cytoscape-graph', 'zoom'),
@@ -159,7 +158,6 @@ def create_dash_app(graph, colors, dimensions):
     return app
 
 def attach_simulation_mode(app, graph, colors, dimensions, positions):
-    # Initialize data cache for external updates
     app.latest_data = {
         'colors': colors.copy() if colors else [],
         'moods': {}
@@ -217,15 +215,15 @@ def attach_simulation_mode(app, graph, colors, dimensions, positions):
             # This will restart the current Python process
             print("Terminating server...")
             os.execl(sys.executable, sys.executable, *sys.argv)
-            # Note: The code after this line won't execute due to the restart
         return ""
-# Example usage
-if __name__ == "__main__1":
-    # Create a sample graph
-    G = nx.Graph()
-    G.add_nodes_from(range(49))  # 49 nodes, 0 to 48
-    G.add_edges_from([(0, 1), (1, 2), (3, 4)])  # Add some edges
+    
 
-    # Run the Dash app
+if __name__ == "__main__1":
+    # test
+    G = nx.Graph()
+    G.add_nodes_from(range(49))
+    G.add_edges_from([(0, 1), (1, 2), (3, 4)])
+
+    # test
     app = create_dash_app(G)
     app.run_server(debug=True)

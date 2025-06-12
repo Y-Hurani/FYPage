@@ -12,7 +12,7 @@ class CooperativeAgent(Agent):
 
     def choose_action(self, state, opponent_id, whatever, **kwargs):
         """
-        Always choose action 1 (cooperate) regardless of state or opponent.
+        Always choose action 1 regardless
         """
         return 1
 
@@ -20,10 +20,7 @@ class CooperativeAgent(Agent):
         self.update_memory(opponent_id, reward)
 
     def reset(self):
-        """
-        Reset memories if needed between episodes or games.
-        """
         self.memories = {opponent_id: [] for opponent_id in range(self.n_agents)}
 
     def keep_connected_to_opponent(self, opponent_id, *args):
-        return 1
+        return 1 # always stay connected, else stays isolated (always exploited, poor guy)

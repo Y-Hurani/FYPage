@@ -7,10 +7,10 @@ class Agent:
         self.n_actions = n_actions
         self.n_agents = n_agents
         self.average_payoff = 0
-        self.total_games = 1
+        self.total_games = 1   # For stats tracking
         self.memories = {opponent_id: [] for opponent_id in range(n_agents)}  # Track memories for each opponent
-        self.total_cooperation = 0
-        self.betrayal_memory = set()
+        self.total_cooperation = 0  # For stats tracking
+        self.betrayal_memory = set() # Holding grudge memory
         self.mood = 50
 
 
@@ -36,7 +36,7 @@ class Agent:
 
     def after_game_function(self, state, action, reward, opponent_reward, opponent_id, opponent_average, **kwargs):
         """
-        Perform updates after each game round (e.g., Q-value updates, mood updates, memory tracking).
+        Perform updates after each game round (Q-value updates, mood updates, memory tracking).
         Must be implemented by subclasses.
         """
         raise NotImplementedError("This method should be overridden by a subclass")
@@ -48,7 +48,7 @@ class Agent:
         """
         pass
 
-    def average_reward(self, opponent_id):
+    def average_reward(self, opponent_id):  # For stats tracking
         if len(self.memories[opponent_id]) == 0:
             return 0
         else:
@@ -56,4 +56,7 @@ class Agent:
 
 
     def keep_connected_to_opponent(self, opponent_id):
+        """
+        Decide whether to stay connected to an opponent or to cut ties. Must be implemented by subclass.
+        """
         return 1

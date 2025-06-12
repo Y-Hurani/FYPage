@@ -14,7 +14,7 @@ from DefectingAgent import DefectingAgent
 from SARSAAgent import SARSAAgent
 from AgentTracker import AgentTracker
 from MoodySARSAAgent import MoodySARSAAgent
-from testing_cypo import create_dash_app, cytoscape_with_layout  # Replace with your actual filename
+from testing_cypo import create_dash_app, cytoscape_with_layout
 from testing_cypo import nx_to_cytoscape
 from dash import dcc, html
 import threading
@@ -29,7 +29,7 @@ class PrisonersDilemmaEnvironment:
         self.n_states = n_states  # Trust levels range from 0 to 9
         self.total = [0, 0]  # Tracks total cooperation/defection counts
 
-        # Initialize trust levels: dictionary of dictionaries
+        # initialize trust levels: dictionary of dictionaries
         self.trust_levels = {agent: {other: 0 for other in range(n_agents) if other != agent}
                              for agent in range(n_agents)}
 
@@ -43,7 +43,7 @@ class PrisonersDilemmaEnvironment:
         """
         Simulate a single game between two agents and update trust levels.
         """
-        # Determine rewards based on actions
+        # determine rewards based on actions
         if action_A == 1 and action_B == 1:  # Both Cooperate
             reward_A, reward_B = 3, 3
             #reward_A +=  self.trust_levels[id_A][id_B] * 0.1
@@ -59,18 +59,12 @@ class PrisonersDilemmaEnvironment:
             reward_A, reward_B = 1, 1
             self.total[0] += 2
 
-        # Update trust levels based on outcomes
-        #self.update_trust(id_A, id_B, action_A, action_B)
-
-        #new_state_a = self.trust_levels[id_A][id_B]
-        #new_state_b = self.trust_levels[id_B][id_A]
 
         return (reward_A, reward_B)
 
     def update_trust(self, agent_A, agent_B, action_A, action_B):
         """
-        Adjust trust levels based on actions.
-        Trust increases with cooperation and decreases with defection.
+        Depreciated
         """
         if action_A == 1:  # Agent A cooperated
             self.trust_levels[agent_B][agent_A] = min(self.n_states - 1, self.trust_levels[agent_B][agent_A] + 1)
@@ -86,7 +80,6 @@ def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     """
     Plays one game of IPD between two agents, retrieving states from the environment.
     """
-
 
     state_A = agent_A.mood if isinstance(agent_A, MoodySARSAAgent) else 50
     state_B = agent_B.mood if isinstance(agent_B, MoodySARSAAgent) else 50
@@ -112,11 +105,6 @@ def play_game(agent_A, agent_B, env, id_A, id_B, fixed=0):
     # Update Q-values for both agents
     agent_A.after_game_function(state_A, action_A, next_state_A, next_action_A, reward_A, reward_B, id_B)
     agent_B.after_game_function(state_B, action_B, next_state_B, next_action_B, reward_B, reward_A, id_A)
-
-
-    # Update the trust states in the environment
-    # env.trust_levels[id_A][id_B] = next_state_A
-    # env.trust_levels[id_B][id_A] = next_state_B
 
 node_positions = {} # Coordinates of each node
 def calculate_distance(node_a, node_b, positions):
@@ -196,11 +184,11 @@ def generate_agents(n_agents, weights, n_states, n_actions, assignment = False):
         total_weight = sum(weights.values())
         normalized_weights = {key: val / total_weight for key, val in weights.items()}
 
-        # Prepare a list of agent types and probabilities
+        # list of agent types and probabilities
         agent_types = list(agent_classes.keys())
         probabilities = [normalized_weights[agent_type] for agent_type in agent_types]
 
-        # Generate agents based on the weighted random selection
+        # Generate agents based on the weigh
         for agent_id in range(n_agents):
             chosen_type = random.choices(agent_types, probabilities, k=1)[0]
             agent_class = agent_classes[chosen_type]
@@ -319,10 +307,6 @@ def main(app, graph, config):
         }
         print('Default parameters')
 
-    # if args.config:
-    #     with open(args.config, 'r') as f:
-    #         file_config = json.load(f)
-    #         config.update(file_config)
 
     # Extract parameters
     global num_nodes, num_edges, dimensions, max_connection_distance, n_states, n_actions, fixed, weights, num_games_per_pair, reconstruction_interval, percent_reconnection, average_considered_betrayal, forgiveness_mode, agents
@@ -344,21 +328,13 @@ def main(app, graph, config):
     print(forgiveness_mode)
     assignment = config['agent_assignment']
     positions = config['node_positions']
-    #graph = create_networkx_graph(num_nodes=num_nodes, num_edges=num_edges)
-
-    #visualize(graph, dimensions)
-    #add_edges_to_graph(graph, num_edges, num_nodes)
     agents = generate_agents(n_agents, weights, n_states, n_actions, assignment)
     
     colors, moods = update_colors_moods(agents)
     env = PrisonersDilemmaEnvironment(n_agents=n_agents, n_states=n_states)
-    # Start the Dash app in a separate thread or process
-    #app = create_dash_app(graph, colors, dimensions)
-    app = app
 
-    #thread = threading.Thread(target=run_server)
-    # thread.daemon = True
-    # thread.start()
+    # Start the Dash app in a separate thread or process
+    app = app
     possible_pairs = [(a, b) for a in range(n_agents) for b in range(a + 1, n_agents)]
     max_degrees = calculate_max_degrees(graph, max_connection_distance, positions)
     subset_size = int(len(possible_pairs) * percent_reconnection)
